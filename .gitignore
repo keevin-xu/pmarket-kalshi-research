@@ -1,0 +1,16 @@
+# secrets & env
+.env
+*.key
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+# data — never commit db or raw vendor dumps
+data/db/*
+!data/db/.gitkeep
+data/raw/*
+!data/raw/.gitkeep
+data/artifacts/*
+!data/artifacts/.gitkeep
