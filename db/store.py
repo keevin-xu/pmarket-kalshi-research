@@ -145,6 +145,39 @@ def upsert_quotes(conn: sqlite3.Connection, rows: Iterable[dict]) -> int:
     return len(payload)
 
 
+def upsert_matches(conn: sqlite3.Connection, rows: Iterable[dict]) -> int:
+    cols = ("match_id", "league", "team_a", "team_b", "start_ts", "best_of",
+            "neutral_source", "result_winner", "result_ts")
+    payload = [tuple(r.get(c) for c in cols) for r in rows]
+    conn.executemany(
+        f"INSERT INTO matches ({','.join(cols)}) VALUES ({','.join('?' * len(cols))}) "
+        "ON CONFLICT(match_id) DO UPDATE SET "
+        "league=excluded.league, team_a=excluded.team_a, team_b=excluded.team_b, "
+        "start_ts=excluded.start_ts, best_of=excluded.best_of, "
+        "neutral_source=excluded.neutral_source, result_winner=excluded.result_winner, "
+        "result_ts=excluded.result_ts",
+        payload,
+    )
+    conn.commit()
+    return len(payload)
+
+
+def upsert_contracts(conn: sqlite3.Connection, rows: Iterable[dict]) -> int:
+    cols = ("contract_id", "venue", "match_id", "family", "outcome_side",
+            "question_text", "parity_ok")
+    payload = [tuple(r.get(c) for c in cols) for r in rows]
+    conn.executemany(
+        f"INSERT INTO contracts ({','.join(cols)}) VALUES ({','.join('?' * len(cols))}) "
+        "ON CONFLICT(contract_id) DO UPDATE SET "
+        "match_id=excluded.match_id, family=excluded.family, "
+        "outcome_side=excluded.outcome_side, question_text=excluded.question_text, "
+        "parity_ok=excluded.parity_ok",
+        payload,
+    )
+    conn.commit()
+    return len(payload)
+
+
 def record_discard(
     conn: sqlite3.Connection, stage: str, reason: str, *,
     contract_id: str | None = None, match_id: str | None = None,

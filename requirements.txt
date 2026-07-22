@@ -1,5 +1,6 @@
 # pinned loosely for scaffolding; freeze exact versions once the env is chosen
 requests>=2.31
+certifi>=2024.2  # CA bundle for SSL verification (some Python builds ship none)
 httpx>=0.27
 python-dateutil>=2.9
 numpy>=1.26

@@ -64,14 +64,28 @@ class LeadLagConfig:
 
 @dataclass(frozen=True)
 class CensusConfig:
-    # Min top-of-book depth per side at signal-moment for a market to count. NOT FROZEN.
+    # Min top-of-book depth per side at signal-moment for a market to count.
+    # FROZEN 2026-07-12 (G0). Measured LIVE on Polymarket (depth over settled
+    # historical books is a bug — the book is gone at settlement).
     min_depth_usd_per_side: float = 250.0
-    # Tier-1 coverage floor vs the neutral schedule. NOT FROZEN.
+    # G0 coverage GATE is an absolute count (RULING 2026-07-12), not a %.
+    min_covered_matches: int = 60
+    # Coverage % is still reported as a diagnostic (not the gate).
     tier1_coverage_floor: float = 0.80
     # Phase-1 market families (props always excluded).
     families_phase1: tuple[str, ...] = ("series_winner", "map_winner")
     # Fuzzy team-name join tolerance (minutes) for coverage checks.
     coverage_join_tolerance_min: int = 90
+    # Team-name fuzzy match threshold (difflib ratio) for the coverage join.
+    team_match_threshold: float = 0.85
+    # Exact tier-1 OE league CODES (FROZEN 2026-07-12). Matched against OE's
+    # `league` field directly — robust vs text parsing; excludes lookalikes
+    # (LCKC = LCK Challengers is NOT here). LTA N/S/plain all normalize to LTA.
+    tier1_oe_leagues: tuple[str, ...] = (
+        "LCK", "LPL", "LEC", "LCS", "LTA", "LCP", "MSI", "WLDs",
+    )
+    # Frozen G0 measurement window (UTC). Matches begin here.
+    window_start: str = "2025-01-01T00:00:00.000Z"
 
 
 @dataclass(frozen=True)

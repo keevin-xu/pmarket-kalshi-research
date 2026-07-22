@@ -12,15 +12,34 @@ from __future__ import annotations
 import re
 
 # Families we care about; everything else (esp. props) is excluded.
+# Patterns cover BOTH venues' real phrasings (pinned in DECISIONS.md recon):
+# Kalshi map events say "Map N"; Polymarket says "Game N Winner"/"(BOn)"/
+# "Match Result". map_winner is checked before series_winner so a per-map
+# question never falls through to series.
 FAMILY_PATTERNS = {
-    "series_winner": [r"\bseries\b", r"\bto win the (match|series)\b", r"\bbest of\b"],
     "map_winner": [r"\bmap \d\b", r"\bgame \d\b"],
+    "series_winner": [
+        r"\bseries\b", r"\bto win the (match|series)\b", r"\bbest of\b",
+        r"\bmatch (result|winner)\b", r"\bseries winner\b", r"\bBO\d\b",
+    ],
 }
-PROP_MARKERS = [r"penta", r"first blood", r"first tower", r"total kills", r"\bMVP\b"]
+PROP_MARKERS = [r"penta", r"first blood", r"first tower", r"total kills",
+                r"\bMVP\b", r"total maps", r"champion", r"\bpick\b"]
 
-# Tier-1 league codes; exclusion list checked FIRST.
-TIER1_CODES = ["LCK", "LPL", "LEC", "LCS", "LCP", "MSI", "Worlds"]
-EXCLUSIONS = ["LCK Challengers", "LPL Academy", "LEC Masters", "LCS Academy"]
+# Tier-1 league CODES + full NAMES (venues sometimes spell out the tournament,
+# e.g. "Mid-Season Invitational" instead of "MSI"). Exclusions checked FIRST.
+TIER1_CODES = ["LCK", "LPL", "LEC", "LCS", "LTA", "LCP", "MSI", "Worlds"]
+TIER1_NAMES = [
+    "Mid-Season Invitational", "World Championship",
+    "League of Legends Champions Korea", "LoL Pro League",
+    "League of Legends EMEA Championship", "League of Legends Championship",
+]
+# Lookalikes that must NOT count as tier-1 (regional/academy/minor leagues).
+EXCLUSIONS = [
+    "LCK Challengers", "LPL Academy", "LEC Masters", "LCS Academy",
+    "Prime League", "HLL", "Hellenic Legends", "Challengers", "Academy",
+    "SuperLiga", "Ultraliga", "NLC", "PG Nationals", "1st Division",
+]
 
 
 def is_prop(text: str) -> bool:
@@ -39,8 +58,17 @@ def classify_family(text: str) -> str | None:
 
 
 def is_tier1(text: str) -> bool:
-    """True iff the text names a tier-1 league, exclusions removed first."""
+    """True iff the text names a tier-1 league, exclusions removed first.
+
+    NOTE: authoritative tier-1 for the coverage population comes from the
+    Oracle's Elixir join (Kalshi map events carry team names but NOT the
+    league). This text predicate is a pre-filter for venue-side text that
+    DOES name the tournament (esp. Polymarket event titles).
+    """
     cleaned = text
     for ex in EXCLUSIONS:
         cleaned = re.sub(re.escape(ex), " ", cleaned, flags=re.IGNORECASE)
-    return any(re.search(rf"\b{re.escape(code)}\b", cleaned) for code in TIER1_CODES)
+    by_code = any(re.search(rf"\b{re.escape(code)}\b", cleaned) for code in TIER1_CODES)
+    by_name = any(re.search(re.escape(name), cleaned, flags=re.IGNORECASE)
+                  for name in TIER1_NAMES)
+    return by_code or by_name

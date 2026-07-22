@@ -13,9 +13,22 @@ tests. No test hits a live vendor.
 """
 from __future__ import annotations
 
+import ssl
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any
+
+try:  # a proper CA bundle — some Python builds ship no system certs
+    import certifi
+    SSL_CONTEXT: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+except ImportError:  # pragma: no cover
+    SSL_CONTEXT = ssl.create_default_context()
+
+# Some venue gateways (Gamma) 403 the default Python-urllib UA; send a real one.
+HTTP_HEADERS = {
+    "Accept": "application/json",
+    "User-Agent": "pmarket-kalshi-research/0.1 (measurement; +research)",
+}
 
 
 class VendorError(RuntimeError):
