@@ -386,3 +386,81 @@ lead-lag depend on recording Polymarket (and Kalshi) prices forward from
 now. Also: re-download Oracle's Elixir (current CSV ends 06-14) so outcomes
 reach the recorded window. G2 verdict: **pending — bounded-date, recorder-
 accrual.** STOP for human review before standing up the recorder / G3.
+
+## [2026-07-22] RESULT — G2 re-run on refreshed OE: PASS (thin sample)
+
+Oracle's Elixir re-downloaded; `2026.csv` now runs to 2026-07-21 (was
+06-14). That overlaps Polymarket's rolling ~30-day price-history window, so
+a paired sample now exists. Artifact `G2_20260722T185454Z.json`
+(sha256 cfd01e32e1c7c3c3).
+- **pre_match:** Kalshi ECE 0.1158 (n=253) vs Polymarket ECE 0.1604 (n=64)
+  → **PASS** (Kalshi at least as calibrated).
+- **in_game:** Kalshi ECE 0.1016 (n=253) vs Polymarket ECE 0.2045 (n=64)
+  → **PASS** (Kalshi much better calibrated).
+- **Corroborator flag (soft pass):** Polymarket has LOWER Brier (0.206 vs
+  0.225 pre; 0.194 vs 0.209 in-game) despite HIGHER ECE — i.e. Polymarket is
+  sharper but less calibrated, Kalshi better calibrated but less sharp. The
+  ECE gate favors Kalshi; the Brier corroborator disagrees in sign, so this
+  is a flagged pass, not a clean one.
+- Sample is THIN (Polymarket n=64, just over the 50 floor) and confined to
+  the ~1-month OE∩Polymarket-history window; more sample needs recorder
+  accrual (Polymarket history evaporates after ~30 days). Supersedes the
+  earlier "insufficient sample" for the comparison; the recorder is still
+  required to sustain/grow it. STOP for human review before G3.
+
+## [2026-07-22] FREEZE — G3 lead-lag (map_winner, per regime)
+
+Frozen before the judged run. Question: when the two venues DIVERGE, which
+one does the other converge toward — i.e. who LEADS? Population = the covered
+map_winner maps in the OE∩Polymarket-history overlap (~trailing 30 days),
+team_a's P(win) series on each venue: Kalshi candlestick mid, Polymarket
+prices-history last, both order-book (NO de-vig). Alignment is AS-OF (each
+instant compares each venue's most recent actual observation; no lookahead,
+no forward-fill of fabricated quotes — a gap is skipped).
+
+Method (per regime; a map's series is split at kickoff into pre_match /
+in_game slices, since leadership can flip):
+- **Divergence:** |kalshi - poly| >= `lead_lag.divergence_threshold` (0.02),
+  same sign, persisting >= `confirmation_snapshots` (3) consecutive compared
+  instants (not a flicker). A cooldown of one convergence window prevents
+  double-counting the same divergence.
+- **Convergence / lead score** over `convergence_window_s` (300 s) after
+  onset: with g0 = kalshi0 - poly0, dP = poly(t0+w) - poly0, dK =
+  kalshi(t0+w) - kalshi0, **L = sign(g0) * (dP + dK)**. L > 0 ⇒ the follower
+  (Polymarket) moved toward Kalshi ⇒ **Kalshi leads**; L < 0 ⇒ Polymarket
+  leads. (Frozen sign convention: positive = Kalshi leads.)
+- **Aggregate:** mean L per regime with a seeded event-block bootstrap by
+  match (series). **PASS (a leader exists) iff the CI excludes 0**; leader =
+  Kalshi if mean > 0 else Polymarket. A regime with < `min_divergences`
+  (30) confirmed divergences is "insufficient sample" (bounded-date; never
+  lower the bar).
+- **Pre-move / co-move check (mandatory caveat):** if both venues reprice
+  together within the confirmation interval (the gap closes symmetrically,
+  L ≈ 0 with tight CI), there is NO tradeable lag however large the
+  instantaneous gap looked — the report says so explicitly. A usable
+  reference must be BOTH calibrated (G2) AND leading (G3); neither alone.
+
+## [2026-07-22] RESULT — G3 lead-lag: Kalshi LEADS in-game, no lead pre-match
+
+Artifact `G3_20260722T190614Z.json` (sha256 c0616f133690f202). 64 maps with
+paired intraday series (the OE∩Polymarket-history overlap). Judged vs the
+frozen G3 rule (leader iff bootstrap CI on mean lead L excludes 0; +L =
+Kalshi leads).
+- **pre_match:** n_divergences=264, mean L=+0.0025, CI [-0.0009, +0.0056]
+  (52 event blocks) → **CI spans 0 → NO leader.** The venues co-move
+  pre-match; no tradeable cross-venue lag.
+- **in_game:** n_divergences=201, mean L=+0.0842, CI [+0.0558, +0.1132]
+  (62 event blocks) → **CI excludes 0, positive → KALSHI LEADS.** When the
+  venues diverge during a live map, Polymarket converges toward Kalshi.
+
+Reading with G2: **in-game, Kalshi is BOTH calibrated (G2 pass, ECE 0.10 vs
+Polymarket 0.20) AND leading (G3 pass) → a usable reference in that regime.**
+Pre-match, Kalshi is calibrated but does NOT lead → calibration without lead
+→ no tradeable cross-venue signal pre-match.
+
+Caveats (carry into G4): sample is the ~1-month overlap (64 maps); series
+are minute-grade candles/history, so measured lag is a LOWER bound on speed
+edge; the 300s convergence window means the lead operates over minutes (its
+tradeability depends on execution latency + the thin Polymarket depth from
+G0, a separate measured capacity cost). Not yet corroborated by a live
+recorder. STOP for human review before G4.

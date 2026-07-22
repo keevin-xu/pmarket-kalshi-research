@@ -44,6 +44,18 @@ def test_family_parity_void_break_fails():
     assert res.n_void_breaks == 1 and not res.passed_gate
 
 
-def test_divergence_detection_not_yet_implemented():
-    with pytest.raises(NotImplementedError):
-        lead_lag.detect_divergences(None, None, "in_game")
+def test_divergence_detection_and_lead_sign():
+    # Kalshi jumps to 0.70 at t=100 and holds; Polymarket lags at 0.50 then
+    # converges up to 0.70 within the 300s window -> KALSHI LEADS.
+    kalshi = [(0, 0.50), (100, 0.70), (200, 0.70), (300, 0.70), (400, 0.70)]
+    poly = [(0, 0.50), (100, 0.50), (200, 0.50), (300, 0.50), (400, 0.70)]
+    divs = lead_lag.detect_divergences(poly, kalshi, "in_game", match_id="m1")
+    assert divs, "should detect a confirmed 0.20 gap"
+    L = lead_lag.convergence_after(divs[0], poly, kalshi)
+    assert L > 0  # follower (Polymarket) moved toward Kalshi => Kalshi leads
+
+
+def test_no_divergence_below_threshold():
+    kalshi = [(t, 0.51) for t in range(0, 500, 60)]
+    poly = [(t, 0.50) for t in range(0, 500, 60)]  # 0.01 gap < 0.02 threshold
+    assert lead_lag.detect_divergences(poly, kalshi, "in_game") == []

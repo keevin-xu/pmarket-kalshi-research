@@ -214,6 +214,83 @@ def run_g2(conn, oe_paths: list[str]) -> dict:
     return payload
 
 
+def run_g3(conn, oe_paths: list[str]) -> dict:
+    """G3 lead-lag for map_winner, per regime. Judged vs the FROZEN rule in
+    DECISIONS.md [2026-07-22]: a leader exists iff the bootstrap CI on the
+    signed lead score excludes zero."""
+    store.init_schema(conn)
+    from reference import lead_lag, leadlag_data
+    maps = leadlag_data.build_map_series(oe_paths)
+    preroll = leadlag_data._PREROLL_S
+
+    regimes = {}
+    for regime in (CONFIG.regimes.PRE_MATCH, CONFIG.regimes.IN_GAME):
+        divs, convs, mids = [], [], []
+        for mp in maps:
+            lo, hi = ((mp["kickoff"] - preroll, mp["kickoff"])
+                      if regime == CONFIG.regimes.PRE_MATCH
+                      else (mp["kickoff"], mp["map_end"] + 1))
+            ps = leadlag_data.slice_series(mp["poly"], lo, hi)
+            ks = leadlag_data.slice_series(mp["kalshi"], lo, hi)
+            if len(ps) < 2 or len(ks) < 2:
+                continue
+            for d in lead_lag.detect_divergences(ps, ks, regime, match_id=mp["match_id"]):
+                # measure convergence on the FULL series (window may cross regime edge)
+                convs.append(lead_lag.convergence_after(d, mp["poly"], mp["kalshi"]))
+                divs.append(d)
+                mids.append(mp["match_id"])
+        rep = lead_lag.lead_lag_report(divs, convs, mids, regime)
+        n = rep["n_divergences"]
+        if n < CONFIG.lead_lag.min_divergences:
+            rep["verdict"] = f"insufficient sample (n_divergences={n} < {CONFIG.lead_lag.min_divergences})"
+            rep["passed"] = None
+        elif rep["leader"]:
+            rep["verdict"] = f"LEADS: {rep['leader']} (CI excludes 0)"
+            rep["passed"] = True
+        else:
+            rep["verdict"] = "no leader — CI spans 0; no tradeable cross-venue lag"
+            rep["passed"] = False
+        regimes[regime] = rep
+
+    payload = {
+        "gate": "G3", "family": "map_winner",
+        "frozen_rules": {"divergence_threshold": CONFIG.lead_lag.divergence_threshold,
+                         "confirmation_snapshots": CONFIG.lead_lag.confirmation_snapshots,
+                         "convergence_window_s": CONFIG.lead_lag.convergence_window_s,
+                         "ci_level": CONFIG.lead_lag.ci_level,
+                         "min_divergences": CONFIG.lead_lag.min_divergences,
+                         "sign": "positive lead score = Kalshi leads"},
+        "n_maps": len(maps),
+        "regimes": regimes,
+        "caveats": [
+            "series are Kalshi candle mid vs Polymarket prices-history last, "
+            "as-of aligned (no lookahead / no fabricated fills).",
+            "if both venues reprice together within the confirmation interval "
+            "the lead score ~0 with tight CI -> NO tradeable lag despite a "
+            "large instantaneous gap.",
+            "sample is the ~1-month OE-and-Polymarket-history overlap; a thin "
+            "or CI-spanning result is resolved by recorder accrual, not a bar move.",
+        ],
+    }
+    payload["artifact_path"] = _write_artifact(conn, "G3", payload)
+    return payload
+
+
+def _print_g3(p: dict) -> None:
+    print("\n===== G3 LEAD-LAG (map_winner) — verdict vs frozen rule =====")
+    print(f"maps with paired intraday series: {p['n_maps']}  "
+          f"(+lead => Kalshi leads; leader iff bootstrap CI excludes 0)")
+    for regime, rep in p["regimes"].items():
+        b = rep["signed_convergence"]
+        print(f"\n[{regime}]  n_divergences={rep['n_divergences']}")
+        print(f"  mean lead L={_fmt(b.get('point'))}  "
+              f"CI[{_fmt(b.get('ci_lo'))}, {_fmt(b.get('ci_hi'))}]  "
+              f"n_blocks={b.get('n_blocks')}")
+        print(f"  VERDICT: {rep['verdict']}  -> passed={rep['passed']}")
+    print(f"\nartifact: {p['artifact_path']}")
+    print("STOP — G3 is a human-review gate. Do not proceed to G4 without review.")
+
+
 def _print_g2(p: dict) -> None:
     print("\n===== G2 CALIBRATION (map_winner) — verdict vs frozen rule =====")
     print(f"total calibration points: {p['n_points_total']}  "
@@ -296,17 +373,16 @@ def main(argv: list[str] | None = None) -> int:
         p = run_g0(conn, paths, live_depth=not args.no_live_depth)
         _print_g0(p)
         return 0
-    if args.gate in ("G1", "G2"):
+    if args.gate in ("G1", "G2", "G3"):
         paths = sorted(glob.glob(args.oe_glob))
         if not paths:
             print(f"no OE CSVs matched {args.oe_glob!r}")
             return 2
-        if args.gate == "G1":
-            _print_g1(run_g1(conn, paths))
-        else:
-            _print_g2(run_g2(conn, paths))
+        {"G1": lambda: _print_g1(run_g1(conn, paths)),
+         "G2": lambda: _print_g2(run_g2(conn, paths)),
+         "G3": lambda: _print_g3(run_g3(conn, paths))}[args.gate]()
         return 0
-    raise NotImplementedError(f"gate={args.gate!r} not wired yet (G0, G1, G2 are)")
+    raise NotImplementedError(f"gate={args.gate!r} not wired yet (G0..G3 are)")
 
 
 if __name__ == "__main__":

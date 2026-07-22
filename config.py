@@ -60,6 +60,8 @@ class LeadLagConfig:
     convergence_window_s: int = 300
     # Bootstrap CI level.
     ci_level: float = 0.95
+    # Minimum confirmed divergences for a judgeable leader verdict per regime.
+    min_divergences: int = 30
 
 
 @dataclass(frozen=True)
