@@ -80,11 +80,33 @@ class KalshiAdapter(Adapter):
 
     # --- candlesticks (historical price series) ------------------------------
     def candlesticks(self, series_ticker: str, market_ticker: str,
-                     start_ts: int, end_ts: int, period_min: int = 60) -> dict:
-        return self.fetch(
+                     start_ts: int, end_ts: int, period_min: int = 1) -> list[dict]:
+        r = self.fetch(
             f"series/{series_ticker}/markets/{market_ticker}/candlesticks",
             start_ts=start_ts, end_ts=end_ts, period_interval=period_min,
         )
+        return r.get("candlesticks", [])
+
+    @staticmethod
+    def candle_mid_at(candles: list[dict], target_ts: int) -> float | None:
+        """Order-book MID (NO de-vig) from the last candle at-or-before
+        target_ts: (yes_bid.close + yes_ask.close)/2. None if no two-sided
+        candle exists yet (a gap is a gap)."""
+        best = None
+        for c in candles:
+            if c.get("end_period_ts", 0) > target_ts:
+                break
+            best = c
+        if best is None:
+            return None
+        try:
+            bid = float(best["yes_bid"]["close_dollars"])
+            ask = float(best["yes_ask"]["close_dollars"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if bid <= 0 and ask <= 0:
+            return None
+        return round((bid + ask) / 2.0, 6)
 
     # --- normalization -------------------------------------------------------
     def to_quote_rows(self, payload: dict) -> list[dict]:

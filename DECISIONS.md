@@ -322,3 +322,67 @@ the frozen G1 rule.
 **Verdict: PASS — the map_winner contracts are the SAME CLAIM across
 venues.** map_winner may proceed to G2 (calibration). STOP for human
 review before G2.
+
+## [2026-07-13] FREEZE — G2 calibration (map_winner, per regime)
+
+Frozen before the judged calibration run. Question: is each venue's price,
+read as P(team wins the map), TRUE (matches realized frequency), and is
+Kalshi at least as calibrated as Polymarket? Population = the G1-passing
+map_winner maps (same claim), tier-1, in window. Outcome = Oracle's Elixir
+map winner (neutral). Reference price = order-book **mid, NO de-vig**
+(config.reference.orderbook_reference). One calibration point per map, per
+venue, using the Blue-side team's market: price = P(team_a wins map),
+outcome = 1 iff OE says team_a won.
+
+Snapshot point-in-time (fixed, avoids the outcome-leak trap):
+- **pre_match:** venue price at the map's KICKOFF = OE map `date` (last
+  quote at-or-before kickoff). OE `date` is per-map (verified).
+- **in_game:** venue price at **kickoff + 600 s** (a 10-minute game-clock
+  checkpoint; `reference.in_game_checkpoint`), for maps whose OE
+  `gamelength` >= 600 s. A DEFINED game state, never the last tick.
+
+Metric + gate (per regime, per venue):
+- Reliability curve over `reference.calibration_buckets` (0.05..0.95);
+  report Brier, log-loss, and **ECE** (the decision metric).
+- Event-block bootstrap by series (seeded) for the CI on Brier.
+- **PASS iff Kalshi ECE <= Polymarket ECE + `reference.calibration_pass_
+  margin` (= 0.0)** — Kalshi must be at least as calibrated as the venue we
+  would trade. A regime with < 50 aligned points is "insufficient sample"
+  (bounded-date verdict; never lower the bar).
+- Corroboration: a venue whose bucket prices systematically miss realized
+  rates in one direction is flagged (stable bias → possible later
+  recalibration map, fit out-of-sample only; NOT applied at this gate).
+
+## [2026-07-13] RESULT — G2 calibration: comparison INSUFFICIENT SAMPLE; Kalshi computed
+
+Artifact `G2_20260722T015853Z.json` (sha256 307c59c1413deab7). Judged vs the
+frozen G2 rule.
+
+- **The cross-venue comparison (the gate) CANNOT be judged: Polymarket
+  n = 0.** Root cause is a compounding data constraint, not a bug:
+  - Oracle's Elixir CSV (the outcome key) ends **2026-06-14** (download
+    vintage); Kalshi LoL history starts 2026-05-16 → Kalshi∩OE outcomes span
+    2026-05-16 … 06-14.
+  - **Polymarket CLOB `prices-history` serves only ~the last 30 days**
+    (verified: every month Jan–Jun 2026 returns EMPTY; only 2026-07 has
+    data). Polymarket historical prices are NOT retrievable retroactively.
+  - Overlap of {OE-covered maps ≤ 06-14} and {Polymarket-priced maps ≥ ~06-22}
+    is **zero** → no paired point exists. Verdict per frozen rule:
+    **insufficient sample** (both regimes). Remedies are the two allowed
+    ones — better measurement (live recorder to accrue Polymarket prices
+    going forward) and calendar accrual — never a threshold change.
+- **Kalshi standalone calibration (diagnostic, full candlestick history,
+  n=189 maps):** pre_match ECE 0.1125 / Brier 0.2310; in_game ECE 0.1353 /
+  Brier 0.2207. Read cautiously — single-map winner is high-variance (a
+  coin-flip Brier is 0.25, so ~0.22–0.23 is expected and near-uninformative
+  at the map level); ECE ~0.11–0.14 over 19 buckets on 189 points is noisy.
+  This says Kalshi *has* a plausible price series to calibrate; it does NOT
+  settle the gate (which is the Kalshi-vs-Polymarket comparison).
+
+**Strategic consequence (resolves "recorder vs move on"):** the live
+recorder is now REQUIRED, not optional. Polymarket price history cannot be
+backfilled beyond ~1 month, so BOTH the G2 cross-venue comparison AND G3
+lead-lag depend on recording Polymarket (and Kalshi) prices forward from
+now. Also: re-download Oracle's Elixir (current CSV ends 06-14) so outcomes
+reach the recorded window. G2 verdict: **pending — bounded-date, recorder-
+accrual.** STOP for human review before standing up the recorder / G3.

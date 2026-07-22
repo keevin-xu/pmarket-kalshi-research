@@ -100,6 +100,14 @@ class PolymarketAdapter(Adapter):
     def book(self, token_id: str) -> dict:
         return self.fetch(self.clob, "book", token_id=token_id)
 
+    def prices_history(self, token_id: str, *, fidelity: int = 1) -> list[dict]:
+        """Full price time-series for a CLOB token: [{t: unix, p: price}].
+        p is P(this outcome). Used to snapshot a calibration price at a fixed
+        instant (last point at-or-before the target)."""
+        h = self.fetch(self.clob, "prices-history", market=token_id,
+                       interval="max", fidelity=fidelity)
+        return h.get("history", [])
+
     def to_quote_rows(self, payload: dict) -> list[dict]:
         """Normalize a CLOB /book snapshot to a quotes row for the YES leg.
 

@@ -212,7 +212,10 @@ def sweep_kalshi_map_results(adapter: KalshiAdapter | None = None) -> list[dict]
             winner = next((m.get("yes_sub_title") for m in mkts
                            if str(m.get("result", "")).strip() == "yes"), None)
             out.append({"teams": teams, "ts": store.to_ts(t), "map_no": int(tail),
-                        "winner": winner, "contract_id": ev.get("event_ticker")})
+                        "winner": winner, "contract_id": ev.get("event_ticker"),
+                        "series": "KXLOLMAP",
+                        "team_markets": {m.get("yes_sub_title"): m.get("ticker")
+                                         for m in mkts}})
         cursor = page.get("cursor") or None
         if not cursor:
             break
@@ -237,8 +240,21 @@ def sweep_polymarket_map_results(adapter: PolymarketAdapter | None = None) -> li
             g = _GAME_NO.search(m.get("question", ""))
             if not g:
                 continue
+            outs = m.get("outcomes")
+            toks = m.get("clobTokenIds")
+            if isinstance(outs, str):
+                try:
+                    outs = json.loads(outs)
+                except ValueError:
+                    outs = []
+            if isinstance(toks, str):
+                try:
+                    toks = json.loads(toks)
+                except ValueError:
+                    toks = []
             out.append({"teams": pair, "ts": store.to_ts(t), "map_no": int(g.group(1)),
-                        "winner": _pm_winner(m), "contract_id": m.get("conditionId")})
+                        "winner": _pm_winner(m), "contract_id": m.get("conditionId"),
+                        "outcomes": outs, "tokens": toks})
     return out
 
 
@@ -250,9 +266,13 @@ def load_oe_map_results(paths: list[str]) -> list[dict]:
             mno = int(m.get("_map_number"))
         except (TypeError, ValueError):
             continue
+        try:
+            gamelen = int(float(m.get("_gamelength")))
+        except (TypeError, ValueError):
+            gamelen = None
         out.append({"teams": (m["team_a"], m["team_b"]), "ts": m["start_ts"],
                     "map_no": mno, "winner": m["result_winner"],
-                    "match_id": m["match_id"]})
+                    "match_id": m["match_id"], "gamelen_s": gamelen})
     return out
 
 

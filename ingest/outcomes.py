@@ -85,5 +85,6 @@ class OutcomesAdapter(Adapter):
                 "result_winner": winners[0].get("teamname"),
                 "result_ts": store.to_ts(start),  # map result known at/after start
                 "_map_number": rows[0].get("game"),
+                "_gamelength": rows[0].get("gamelength"),  # seconds; for in-game checkpoint
             })
         return out

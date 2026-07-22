@@ -174,6 +174,66 @@ def run_g1(conn, oe_paths: list[str]) -> dict:
     return payload
 
 
+def run_g2(conn, oe_paths: list[str]) -> dict:
+    """G2 calibration for map_winner, per regime. Judged vs the FROZEN rule
+    in DECISIONS.md [2026-07-13]: Kalshi ECE <= Polymarket ECE + margin."""
+    store.init_schema(conn)
+    from reference import calib_data, calibration
+    points = calib_data.build_points(oe_paths)
+    min_n = 50
+    regimes = {}
+    for regime in (CONFIG.regimes.PRE_MATCH, CONFIG.regimes.IN_GAME):
+        cmp = calibration.compare_venues(points, regime)
+        k_n = cmp["kalshi"].get("n", 0)
+        p_n = cmp["polymarket"].get("n", 0)
+        if k_n < min_n or p_n < min_n:
+            cmp["verdict"] = f"insufficient sample (kalshi n={k_n}, poly n={p_n}, min {min_n})"
+            cmp["passed"] = None
+        else:
+            cmp["verdict"] = ("PASS — Kalshi at least as calibrated"
+                              if cmp["kalshi_calibrated_vs_poly"]
+                              else "FAIL — Kalshi less calibrated than Polymarket")
+            cmp["passed"] = cmp["kalshi_calibrated_vs_poly"]
+        regimes[regime] = cmp
+
+    payload = {
+        "gate": "G2", "family": "map_winner",
+        "frozen_rules": {"metric": "ECE", "pass_margin": CONFIG.reference.calibration_pass_margin,
+                         "min_sample": min_n, "buckets": list(CONFIG.reference.calibration_buckets)},
+        "n_points_total": len(points),
+        "regimes": regimes,
+        "caveats": [
+            "one point per map (Blue-side team); price = P(team_a wins), "
+            "outcome from Oracle's Elixir (neutral).",
+            "pre_match = mid at kickoff; in_game = mid at kickoff+600s (10-min "
+            "game clock), maps with gamelen>=600s only.",
+            "prices are order-book mid (Kalshi) / last (Polymarket), NO de-vig.",
+        ],
+    }
+    payload["artifact_path"] = _write_artifact(conn, "G2", payload)
+    return payload
+
+
+def _print_g2(p: dict) -> None:
+    print("\n===== G2 CALIBRATION (map_winner) — verdict vs frozen rule =====")
+    print(f"total calibration points: {p['n_points_total']}  "
+          f"(metric=ECE, pass = Kalshi ECE <= Poly ECE + {p['frozen_rules']['pass_margin']})")
+    for regime, cmp in p["regimes"].items():
+        k, pm = cmp["kalshi"], cmp["polymarket"]
+        print(f"\n[{regime}]")
+        print(f"  kalshi:     n={k.get('n')}  ECE={_fmt(k.get('ece'))}  "
+              f"Brier={_fmt(k.get('brier'))}  logloss={_fmt(k.get('log_loss'))}")
+        print(f"  polymarket: n={pm.get('n')}  ECE={_fmt(pm.get('ece'))}  "
+              f"Brier={_fmt(pm.get('brier'))}  logloss={_fmt(pm.get('log_loss'))}")
+        print(f"  VERDICT: {cmp['verdict']}  -> passed={cmp['passed']}")
+    print(f"\nartifact: {p['artifact_path']}")
+    print("STOP — G2 is a human-review gate. Do not proceed to G3 without review.")
+
+
+def _fmt(x):
+    return "n/a" if x is None else f"{x:.4f}"
+
+
 def _print_g1(p: dict) -> None:
     print("\n===== G1 SETTLEMENT PARITY (map_winner) — verdict vs frozen rule =====")
     print(f"aligned played maps: {p['n_aligned_played_maps']} "
@@ -236,14 +296,17 @@ def main(argv: list[str] | None = None) -> int:
         p = run_g0(conn, paths, live_depth=not args.no_live_depth)
         _print_g0(p)
         return 0
-    if args.gate == "G1":
+    if args.gate in ("G1", "G2"):
         paths = sorted(glob.glob(args.oe_glob))
         if not paths:
             print(f"no OE CSVs matched {args.oe_glob!r}")
             return 2
-        _print_g1(run_g1(conn, paths))
+        if args.gate == "G1":
+            _print_g1(run_g1(conn, paths))
+        else:
+            _print_g2(run_g2(conn, paths))
         return 0
-    raise NotImplementedError(f"gate={args.gate!r} not wired yet (G0, G1 are)")
+    raise NotImplementedError(f"gate={args.gate!r} not wired yet (G0, G1, G2 are)")
 
 
 if __name__ == "__main__":
