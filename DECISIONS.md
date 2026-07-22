@@ -464,3 +464,57 @@ edge; the 300s convergence window means the lead operates over minutes (its
 tradeability depends on execution latency + the thin Polymarket depth from
 G0, a separate measured capacity cost). Not yet corroborated by a live
 recorder. STOP for human review before G4.
+
+## [2026-07-22] FREEZE — G4 combination rule + bounded verdict date
+
+The final go/no-go, assembled from the stored G0–G3 artifacts (every number
+traces to one). Two layers, judged per regime:
+
+- **Reference validity (the research question):** Kalshi is a USABLE
+  REFERENCE in a regime iff ALL hold — G1 parity PASS (same claim, family)
+  AND G2 calibration PASS for that regime (Kalshi ECE <= Poly ECE + margin)
+  AND G3 lead PASS for that regime (Kalshi leads, CI excludes 0). Calibration
+  without lead, or lead without calibration, is NOT a usable reference.
+- **Tradeability (go/no-go for a *separate* future execution repo):**
+  reference-valid in that regime AND the traded venue (Polymarket) clears the
+  G0 depth floor AND the result is live-recorder-corroborated. (This repo is
+  measurement-only; it never trades. A "reference valid but not yet
+  tradeable" outcome is a SUCCESS, not a failure.)
+
+Overall verdict:
+- GO (execution justified) iff some regime is reference-valid AND tradeable.
+- CONDITIONAL / NOT-YET iff some regime is reference-valid but tradeability
+  is unmet (depth / live-corroboration / thin sample) → judged again at the
+  bounded date after recorder accrual.
+- KILL iff no regime is reference-valid.
+
+**Bounded verdict date: 2026-09-30.** Whatever sample exists then is judged
+by these frozen rules; short sample is remedied only by better measurement
+or calendar accrual, never by moving a threshold.
+
+## [2026-07-22] RESULT — G4 FINAL VERDICT: CONDITIONAL (reference valid in-game, not yet tradeable)
+
+Artifact `G4_20260722T191945Z.json` (sha256 4b12f2ba15376ab9). Assembled
+from the current G0–G3 artifacts (traced within). Refreshed inputs: G0
+covered=91 (PASS), G1 253/253 (PASS), G2 pass both regimes (thin), G3
+in-game Kalshi leads / pre-match no leader.
+
+**VERDICT: CONDITIONAL — Kalshi is a usable price reference for tier-1 LoL
+map-winner IN-GAME, but the edge is not yet tradeable.**
+- **in_game: reference-valid = TRUE.** Parity PASS ∧ calibration PASS
+  (Kalshi ECE 0.1016 vs Polymarket 0.2045) ∧ lead PASS (Kalshi leads,
+  n_div=201, CI excludes 0). Kalshi is both the more-calibrated book and the
+  one Polymarket converges toward.
+- **pre_match: reference-valid = FALSE.** Calibrated (ECE 0.1158 vs 0.1604)
+  but NO lead (CI spans 0) → truth arrives too late to trade → no signal.
+- **tradeable = FALSE (both regimes).** Blockers: (1) Polymarket depth below
+  the $250/side floor (live snapshot $1–2/side — a capacity kill risk);
+  (2) no live-recorder corroboration (historical-only); (3) thin ~1-month
+  sample (Polymarket price-history retention).
+
+This is a SUCCESSFUL measurement outcome, not a failure: a real, regime-
+specific reference-validity result plus a clear, honest reason it is not yet
+a trade. Per the frozen rule it is **judged again at the bounded date
+2026-09-30** after recorder accrual (which alone can harden the sample,
+supply the honest tier-1 depth number, and live-corroborate the in-game
+lead). No threshold may move in the interim. All gates G0–G4 complete.

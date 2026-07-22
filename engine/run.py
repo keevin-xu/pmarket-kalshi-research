@@ -214,6 +214,33 @@ def run_g2(conn, oe_paths: list[str]) -> dict:
     return payload
 
 
+def _latest_artifact(gate: str) -> dict | None:
+    from config import ARTIFACTS_DIR
+    files = sorted(ARTIFACTS_DIR.glob(f"{gate}_*.json"), key=lambda p: p.stat().st_mtime)
+    if not files:
+        return None
+    d = json.loads(files[-1].read_text())
+    d["artifact_path"] = str(files[-1])   # the on-disk JSON doesn't store its own path
+    return d
+
+
+def run_g4(conn) -> dict:
+    """G4 final verdict — combine the latest stored G0–G3 artifacts per the
+    frozen G4 rule. No re-measuring; every number traces to its artifact."""
+    store.init_schema(conn)
+    from analysis import report
+    g = {name: _latest_artifact(gate)
+         for name, gate in (("census", "G0"), ("parity", "G1"),
+                            ("calibration", "G2"), ("lead_lag", "G3"))}
+    missing = [k for k, v in g.items() if v is None]
+    if missing:
+        raise SystemExit(f"G4 needs prior artifacts; missing: {missing}. Run those gates first.")
+    verdict = report.build_verdict(g["census"], g["parity"], g["calibration"],
+                                   g["lead_lag"], live_corroborated=False)
+    verdict["artifact_path"] = _write_artifact(conn, "G4", verdict)
+    return verdict
+
+
 def run_g3(conn, oe_paths: list[str]) -> dict:
     """G3 lead-lag for map_winner, per regime. Judged vs the FROZEN rule in
     DECISIONS.md [2026-07-22]: a leader exists iff the bootstrap CI on the
@@ -382,7 +409,15 @@ def main(argv: list[str] | None = None) -> int:
          "G2": lambda: _print_g2(run_g2(conn, paths)),
          "G3": lambda: _print_g3(run_g3(conn, paths))}[args.gate]()
         return 0
-    raise NotImplementedError(f"gate={args.gate!r} not wired yet (G0..G3 are)")
+    if args.gate == "G4":
+        from analysis import report
+        v = run_g4(conn)
+        print(report.render(v))
+        print(f"\nartifact: {v['artifact_path']}")
+        print("G4 is the terminal gate — verdict stands until the bounded date "
+              "or a recorder-accrued re-run.")
+        return 0
+    raise NotImplementedError(f"gate={args.gate!r} not wired yet (G0..G4 are)")
 
 
 if __name__ == "__main__":
