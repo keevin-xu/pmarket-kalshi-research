@@ -256,3 +256,69 @@ pass; population is real). Depth is an open concern to be resolved by the
 recorder before any tradeability claim — it does NOT block G1 (settlement
 parity), which is not depth-dependent. series_winner is killed. STOP for
 human review before G1.
+
+## [2026-07-13] FREEZE — G1 settlement parity (map_winner family)
+
+Frozen before the judged parity run. Applies to the ONLY surviving phase-1
+family, **map_winner** (series_winner was killed at G0).
+
+Recon of both venues' settlement semantics (pinned; un-judged):
+- **Kalshi KXLOLMAP**: one market per team per map; resolves Yes for that
+  map's winner of the specific scheduled match; map number = event-ticker
+  suffix (`KXLOLMAP-…HLEBLG-3` → map 3). Source = governing-league result.
+- **Polymarket "Game N Winner"**: resolves via UMA against gol.gg / the
+  match stream; winner = the outcome priced 1. Source/mechanism differs
+  from Kalshi but tracks the same real-world map result.
+
+"Same claim" per family is proven by an empirical, neutral-arbitrated test
+over the covered matches:
+- **Alignment:** a Kalshi map market and a Polymarket "Game N Winner" market
+  are paired iff same fuzzy team-pair, same map number, within ±1 day.
+- **Result agreement (the gate):** on aligned maps that Oracle's Elixir
+  records as PLAYED, `kalshi_winner == polymarket_winner` (team-name fuzzy).
+  **Family passes iff agreement rate ≥ `parity.min_family_pass_rate` = 0.95**
+  over aligned played maps, with a minimum of 30 aligned maps (else verdict
+  is "insufficient parity sample", judged on the bounded date — never by
+  lowering the bar).
+- **Neutral corroboration:** report each venue's agreement with the OE map
+  winner; a high venue-vs-venue rate with low venue-vs-OE rate is suspect.
+- **Void consistency:** a map NOT played per OE (no OE gameid) that a venue
+  nonetheless resolved to a team is a void-handling break; both venues must
+  void unplayed maps. Any such case is enumerated, not averaged away.
+- Every non-agreeing or one-sided/void map is a stored discard with a
+  reason code; the disagreement list is a first-class G1 output. Resolution-
+  source difference (governing league vs UMA/gol.gg) is a documented caveat,
+  not a fail, provided result agreement + void consistency hold.
+
+## [2026-07-13] CORRECTION — G0 coverage 115 -> 72 (measurement-bug fix)
+
+The [2026-07-13] G0 RESULT reported `n_covered = 115`. That number was
+inflated by team-name matching bugs found while building G1; the corrected
+number is **`n_covered = 72`** (artifact `G0_20260722T012056Z.json`,
+sha256 709001382fa2c862). The original entry stands (append-only); this
+corrects it. Bugs fixed (measurement only — no frozen threshold moved):
+- team normalizer stripped "academy"/"challengers" as noise, collapsing
+  secondary squads into their tier-1 parents ("T1 Academy" -> "T1");
+- added a secondary-squad guard (academy/youth/challengers/junior/
+  development on one side only => different team);
+- `map_winner` classification required only "game N", so totals/props
+  ("Game 1: Both Teams Slay Baron", "Games Total O/U") leaked in; it now
+  requires a winner notion too.
+**G0 verdict is UNCHANGED: coverage PASS** (72 >= 60 floor). The honest
+number sits comfortably above the floor — the count-based gate holds.
+
+## [2026-07-13] RESULT — G1 settlement parity: PASS (map_winner)
+
+Artifact `G1_20260722T012014Z.json` (sha256 f8b422331f2b232e). Judged vs
+the frozen G1 rule.
+- **Venue agreement: 189/189 = 100%** on aligned played maps (min 30).
+  Kalshi and Polymarket settle the identical winner on every map.
+- **Neutral corroboration:** each venue agrees with the Oracle's Elixir map
+  winner 100% (kalshi 1.0, polymarket 1.0).
+- **Void handling: 0 breaks** — neither venue resolved an unplayed map.
+- Resolution-source difference (Kalshi governing-league result vs
+  Polymarket UMA/gol.gg) is a documented caveat; it did not affect realized
+  settlement on this sample.
+**Verdict: PASS — the map_winner contracts are the SAME CLAIM across
+venues.** map_winner may proceed to G2 (calibration). STOP for human
+review before G2.

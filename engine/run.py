@@ -18,6 +18,7 @@ from config import CONFIG
 from census import coverage as cov
 from census import depth as depthmod
 from census import sweep
+from parity import settlement
 from db import store
 
 GATES = ["ingest", "G0", "G1", "G2", "G3", "G4"]
@@ -134,6 +135,64 @@ def run_g0(conn, oe_paths: list[str], *, live_depth: bool = True) -> dict:
     return payload
 
 
+def run_g1(conn, oe_paths: list[str]) -> dict:
+    """G1 settlement parity for map_winner. Judged vs the FROZEN rule in
+    DECISIONS.md [2026-07-13]. OE is the neutral arbiter."""
+    store.init_schema(conn)
+    oe_maps = sweep.load_oe_map_results(oe_paths)
+    k = sweep.sweep_kalshi_map_results()
+    p = sweep.sweep_polymarket_map_results()
+    res = settlement.check_family_parity(oe_maps, k, p, family="map_winner")
+
+    # every disagreement is a stored discard with a reason
+    for d in res.disagreements:
+        store.record_discard(conn, "parity", d.get("kind", "parity_mismatch"),
+                             match_id=None)
+
+    payload = {
+        "gate": "G1", "family": res.family,
+        "frozen_rules": {"min_family_pass_rate": CONFIG.parity.min_family_pass_rate,
+                         "min_aligned_maps": CONFIG.parity.min_aligned_maps},
+        "n_aligned_played_maps": res.n_aligned,
+        "n_agree": res.n_agree,
+        "agreement_rate": res.pass_rate,
+        "oe_agreement": {"kalshi": res.oe_agree_kalshi,
+                         "polymarket": res.oe_agree_polymarket},
+        "n_void_breaks": res.n_void_breaks,
+        "verdict": res.verdict,
+        "passed_gate": res.passed_gate,
+        "disagreements_sample": res.disagreements[:25],
+        "caveats": [
+            "OE is the neutral arbiter; venue-vs-venue agreement is the gate, "
+            "venue-vs-OE is corroboration.",
+            "resolution source differs (Kalshi governing-league result vs "
+            "Polymarket UMA/gol.gg) — a documented caveat, not a fail, given "
+            "result agreement + void consistency hold.",
+        ],
+    }
+    payload["artifact_path"] = _write_artifact(conn, "G1", payload)
+    return payload
+
+
+def _print_g1(p: dict) -> None:
+    print("\n===== G1 SETTLEMENT PARITY (map_winner) — verdict vs frozen rule =====")
+    print(f"aligned played maps: {p['n_aligned_played_maps']} "
+          f"(min {p['frozen_rules']['min_aligned_maps']})")
+    print(f"venue agreement:     {p['n_agree']}/{p['n_aligned_played_maps']} "
+          f"= {p['agreement_rate']*100:.1f}%  (gate >= "
+          f"{p['frozen_rules']['min_family_pass_rate']*100:.0f}%)")
+    print(f"OE corroboration:    kalshi={p['oe_agreement']['kalshi']} "
+          f"polymarket={p['oe_agreement']['polymarket']}")
+    print(f"void-handling breaks: {p['n_void_breaks']}")
+    print(f"VERDICT: {p['verdict']}  -> passed_gate={p['passed_gate']}")
+    if p["disagreements_sample"]:
+        print("sample disagreements:")
+        for d in p["disagreements_sample"][:8]:
+            print("  ", d)
+    print(f"\nartifact: {p['artifact_path']}")
+    print("STOP — G1 is a human-review gate. Do not proceed to G2 without review.")
+
+
 def _print_g0(p: dict) -> None:
     c = p["coverage"]
     print("\n===== G0 FEASIBILITY CENSUS — verdict vs frozen rules =====")
@@ -177,7 +236,14 @@ def main(argv: list[str] | None = None) -> int:
         p = run_g0(conn, paths, live_depth=not args.no_live_depth)
         _print_g0(p)
         return 0
-    raise NotImplementedError(f"gate={args.gate!r} not wired yet (G0 is)")
+    if args.gate == "G1":
+        paths = sorted(glob.glob(args.oe_glob))
+        if not paths:
+            print(f"no OE CSVs matched {args.oe_glob!r}")
+            return 2
+        _print_g1(run_g1(conn, paths))
+        return 0
+    raise NotImplementedError(f"gate={args.gate!r} not wired yet (G0, G1 are)")
 
 
 if __name__ == "__main__":

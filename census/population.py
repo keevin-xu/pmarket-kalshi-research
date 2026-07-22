@@ -11,20 +11,19 @@ from __future__ import annotations
 
 import re
 
-# Families we care about; everything else (esp. props) is excluded.
-# Patterns cover BOTH venues' real phrasings (pinned in DECISIONS.md recon):
-# Kalshi map events say "Map N"; Polymarket says "Game N Winner"/"(BOn)"/
-# "Match Result". map_winner is checked before series_winner so a per-map
-# question never falls through to series.
-FAMILY_PATTERNS = {
-    "map_winner": [r"\bmap \d\b", r"\bgame \d\b"],
-    "series_winner": [
-        r"\bseries\b", r"\bto win the (match|series)\b", r"\bbest of\b",
-        r"\bmatch (result|winner)\b", r"\bseries winner\b", r"\bBO\d\b",
-    ],
-}
+# Families we care about; everything else (esp. props/totals) is excluded.
+# map_winner requires BOTH a map/game number AND a winner notion — otherwise
+# "Game 1: Both Teams Slay Baron" or "Games Total O/U 2.5" leak in as maps.
+_MAP_NO = re.compile(r"\b(?:map|game) \d\b", re.IGNORECASE)
+_WINNER = re.compile(r"\bwinner\b|\bto win\b|\bwins\b", re.IGNORECASE)
+SERIES_PATTERNS = [
+    r"\bseries\b", r"\bto win the (match|series)\b", r"\bbest of\b",
+    r"\bmatch (result|winner)\b", r"\bseries winner\b", r"\bBO\d\b",
+]
 PROP_MARKERS = [r"penta", r"first blood", r"first tower", r"total kills",
-                r"\bMVP\b", r"total maps", r"champion", r"\bpick\b"]
+                r"\bMVP\b", r"total maps?", r"\bchampion\b", r"\bpick\b",
+                r"\bbaron\b", r"\bdragon\b", r"\bhandicap\b", r"\bO/U\b",
+                r"\bover/under\b", r"\bkills?\b", r"\bslay\b"]
 
 # Tier-1 league CODES + full NAMES (venues sometimes spell out the tournament,
 # e.g. "Mid-Season Invitational" instead of "MSI"). Exclusions checked FIRST.
@@ -48,12 +47,16 @@ def is_prop(text: str) -> bool:
 
 
 def classify_family(text: str) -> str | None:
-    """Return family name or None. Props/unknown -> None (excluded)."""
+    """Return family name or None. Props/totals/unknown -> None (excluded).
+
+    map_winner requires a map/game number AND a winner notion (checked first,
+    so a per-map winner never falls through to series)."""
     if is_prop(text):
         return None
-    for fam, pats in FAMILY_PATTERNS.items():
-        if any(re.search(p, text, re.IGNORECASE) for p in pats):
-            return fam
+    if _MAP_NO.search(text) and _WINNER.search(text):
+        return "map_winner"
+    if any(re.search(p, text, re.IGNORECASE) for p in SERIES_PATTERNS):
+        return "series_winner"
     return None
 
 

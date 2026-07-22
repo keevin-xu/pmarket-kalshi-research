@@ -20,10 +20,20 @@ from config import CONFIG
 from db import store
 
 # Common esports org suffixes stripped before matching (do not carry signal).
+# NB: "academy"/"challengers" are NOT stripped — they denote a DIFFERENT
+# (secondary) squad; collapsing "T1 Academy" -> "T1" creates false matches.
 _SUFFIXES = re.compile(
-    r"\b(esports|e-sports|gaming|club|team|academy|challengers|"
-    r"pro|the|of|legends)\b", re.IGNORECASE)
+    r"\b(esports|e-sports|gaming|club|team|pro|the|of|legends)\b", re.IGNORECASE)
 _NONALNUM = re.compile(r"[^a-z0-9 ]+")
+# Markers of a SECONDARY squad. If exactly one side has one, the two names
+# denote different teams (e.g. "T1 Academy" != "T1", "BNK FearX Youth" != "BNK
+# FEARX") — block the match regardless of string similarity.
+_SECONDARY = re.compile(r"\b(academy|challengers|youth|junior|development)\b",
+                        re.IGNORECASE)
+
+
+def _has_secondary(name: str) -> bool:
+    return bool(_SECONDARY.search(name or ""))
 
 
 def _deapos(s: str) -> str:
@@ -60,6 +70,8 @@ def team_match(a: str, b: str, threshold: float | None = None) -> bool:
     (e.g. BLG for Bilibili Gaming) are NOT matched — a miss only UNDERcounts
     coverage (conservative), never inflates it."""
     threshold = CONFIG.census.team_match_threshold if threshold is None else threshold
+    if _has_secondary(a) != _has_secondary(b):
+        return False  # one is an academy/youth squad, the other isn't
     na, nb = normalize_team(a), normalize_team(b)
     if not na or not nb:
         return False

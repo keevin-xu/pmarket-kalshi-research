@@ -13,6 +13,7 @@ coverage rows, live for the depth snapshots.
 """
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timezone
 
@@ -152,6 +153,107 @@ def sweep_polymarket(adapter: PolymarketAdapter | None = None) -> tuple[list[dic
                 "outcome_side": f"{pair[0]} vs {pair[1]}",
                 "question_text": text, "parity_ok": None})
     return records, contracts
+
+
+# --- Per-map SETTLED results (for settlement parity) -------------------------
+_GAME_NO = re.compile(r"\bgame (\d+)\b", re.IGNORECASE)
+
+
+def _pm_winner(market: dict) -> str | None:
+    """Winning outcome name of a settled Polymarket market, or None (void/
+    unsettled). outcomes/outcomePrices are JSON-string arrays aligned by idx."""
+    outs = market.get("outcomes")
+    prices = market.get("outcomePrices")
+    if isinstance(outs, str):
+        try:
+            outs = json.loads(outs)
+        except ValueError:
+            return None
+    if isinstance(prices, str):
+        try:
+            prices = json.loads(prices)
+        except ValueError:
+            return None
+    if not outs or not prices or len(outs) != len(prices):
+        return None
+    for name, pr in zip(outs, prices):
+        try:
+            if abs(float(pr) - 1.0) < 1e-9:
+                return name
+        except (TypeError, ValueError):
+            continue
+    return None  # no side at 1.0 -> void / not resolved
+
+
+def sweep_kalshi_map_results(adapter: KalshiAdapter | None = None) -> list[dict]:
+    """Per-map settled records from KXLOLMAP: {teams, ts, map_no, winner}.
+    winner = yes_sub_title of the market whose result == 'yes', else None."""
+    adapter = adapter or KalshiAdapter()
+    out: list[dict] = []
+    cursor = None
+    while True:
+        page = adapter.list_events("KXLOLMAP", status="settled", cursor=cursor)
+        events = page.get("events", [])
+        if not events:
+            break
+        for ev in events:
+            mkts = ev.get("markets") or []
+            if len(mkts) < 2:
+                continue
+            tail = (ev.get("event_ticker") or "").rsplit("-", 1)[-1]
+            if not tail.isdigit():
+                continue
+            t = _iso_to_dt(mkts[0].get("close_time"))
+            if t is None or t < _WINDOW_START:
+                continue
+            teams = (mkts[0].get("yes_sub_title"), mkts[1].get("yes_sub_title"))
+            if not all(teams):
+                continue
+            winner = next((m.get("yes_sub_title") for m in mkts
+                           if str(m.get("result", "")).strip() == "yes"), None)
+            out.append({"teams": teams, "ts": store.to_ts(t), "map_no": int(tail),
+                        "winner": winner, "contract_id": ev.get("event_ticker")})
+        cursor = page.get("cursor") or None
+        if not cursor:
+            break
+    return out
+
+
+def sweep_polymarket_map_results(adapter: PolymarketAdapter | None = None) -> list[dict]:
+    """Per-map settled records from Polymarket 'Game N Winner' markets."""
+    adapter = adapter or PolymarketAdapter()
+    out: list[dict] = []
+    for ev in adapter.iter_events(closed=True, stop_before=CONFIG.census.window_start):
+        pair = parse_pm_title(ev.get("title", ""))
+        if pair is None:
+            continue
+        t = pm_match_dt(ev)
+        if t is None or t < _WINDOW_START:
+            continue
+        for m in ev.get("markets", []) or []:
+            text = f'{ev.get("title","")} — {m.get("question","")}'
+            if pop.is_prop(text) or pop.classify_family(text) != "map_winner":
+                continue
+            g = _GAME_NO.search(m.get("question", ""))
+            if not g:
+                continue
+            out.append({"teams": pair, "ts": store.to_ts(t), "map_no": int(g.group(1)),
+                        "winner": _pm_winner(m), "contract_id": m.get("conditionId")})
+    return out
+
+
+def load_oe_map_results(paths: list[str]) -> list[dict]:
+    """Tier-1, in-window OE PLAYED maps: {teams, ts, map_no, winner}."""
+    out: list[dict] = []
+    for m in load_oe_matches(paths):
+        try:
+            mno = int(m.get("_map_number"))
+        except (TypeError, ValueError):
+            continue
+        out.append({"teams": (m["team_a"], m["team_b"]), "ts": m["start_ts"],
+                    "map_no": mno, "winner": m["result_winner"],
+                    "match_id": m["match_id"]})
+    return out
 
 
 # --- Polymarket (OPEN markets -> live book snapshots for depth) --------------

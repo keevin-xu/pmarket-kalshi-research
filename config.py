@@ -90,8 +90,12 @@ class CensusConfig:
 
 @dataclass(frozen=True)
 class ParityConfig:
-    # Fraction of matched contracts per family that must pass same-claim parity. NOT FROZEN.
+    # Venue-vs-venue result-agreement rate required on aligned PLAYED maps.
+    # FROZEN 2026-07-13 (G1).
     min_family_pass_rate: float = 0.95
+    # Minimum aligned played maps for a judgeable verdict (else "insufficient
+    # parity sample", resolved by calendar accrual, never by lowering the bar).
+    min_aligned_maps: int = 30
 
 
 @dataclass(frozen=True)
