@@ -1,0 +1,160 @@
+{
+  "caveats": [
+    "coverage counts SERIES ((team-pair, day)); OE gameid is per-map.",
+    "depth is LIVE-only (settled books are gone at resolution). This is a ONE-SHOT snapshot of whatever LoL markets are open at run time \u2014 mixed tier (often minor leagues), top-of-book only, NOT a rigorous tier-1 signal-moment measurement. Indicative, not the final depth verdict; the binding number needs the live recorder over tier-1 matches at kickoff.",
+    "series_winner on Kalshi (KXLOL) had 0 settled match markets; Kalshi's match-level LoL product is the MAP winner. series_winner is excluded.",
+    "cross-venue window is bounded by Kalshi's LoL launch (~2026-05-06); low coverage %% reflects that short venue history, not poor matching. Team-name join misses non-derivable aliases (e.g. BLG) -> UNDERcount."
+  ],
+  "coverage": {
+    "coverage_pct": 0.04577240940877304,
+    "covered_match_ids": [
+      "LOLTMNT01_387874",
+      "13275-13275_game_1",
+      "LOLTMNT02_402697",
+      "LOLTMNT01_387927",
+      "LOLTMNT02_402752",
+      "13276-13276_game_1",
+      "LOLTMNT02_402931",
+      "LOLTMNT02_401990",
+      "LOLTMNT01_390036",
+      "13277-13277_game_1",
+      "LOLTMNT02_403066",
+      "LOLTMNT02_403119",
+      "13278-13278_game_1",
+      "LOLTMNT02_403298",
+      "LOLTMNT02_403327",
+      "LOLTMNT02_406455",
+      "LOLTMNT02_406958",
+      "LOLTMNT02_407714",
+      "13279-13279_game_1",
+      "LOLTMNT02_409322",
+      "LOLTMNT02_409399",
+      "13280-13280_game_1",
+      "LOLTMNT02_409510",
+      "LOLTMNT05_196094",
+      "LOLTMNT02_411013",
+      "13281-13281_game_1",
+      "LOLTMNT02_412046",
+      "LOLTMNT02_411260",
+      "13282-13282_game_1",
+      "LOLTMNT05_196170",
+      "LOLTMNT02_412354",
+      "LOLTMNT05_195244",
+      "LOLTMNT02_413377",
+      "LOLTMNT02_414553",
+      "LOLTMNT02_414612",
+      "13283-13283_game_1",
+      "LOLTMNT02_415076",
+      "13284-13284_game_1",
+      "13285-13285_game_1",
+      "LOLTMNT02_415309",
+      "LOLTMNT02_415344",
+      "13286-13286_game_1",
+      "LOLTMNT02_416145",
+      "LOLTMNT05_195504",
+      "LOLTMNT01_394298",
+      "LOLTMNT02_416423",
+      "13287-13287_game_1",
+      "LOLTMNT02_416470",
+      "LOLTMNT05_195554",
+      "LOLTMNT01_394399",
+      "13288-13288_game_1",
+      "LOLTMNT05_196548",
+      "13289-13289_game_1",
+      "13290-13290_game_1",
+      "LOLTMNT02_418305",
+      "LOLTMNT02_417420",
+      "13292-13292_game_1",
+      "LOLTMNT05_196602",
+      "LOLTMNT01_398189",
+      "LOLTMNT01_399193",
+      "LOLTMNT02_417498",
+      "13293-13293_game_1",
+      "LOLTMNT05_195683",
+      "LOLTMNT01_399373",
+      "13294-13294_game_1",
+      "LOLTMNT01_405344",
+      "LOLTMNT01_404540",
+      "13295-13295_game_1",
+      "LOLTMNT01_405648",
+      "LOLTMNT01_404715",
+      "13296-13296_game_1",
+      "LOLTMNT01_405807"
+    ],
+    "existence": {
+      "kalshi": [
+        "map_winner",
+        "series_winner"
+      ],
+      "polymarket": [
+        "map_winner",
+        "series_winner"
+      ]
+    },
+    "gate_min_covered": 60,
+    "n_covered": 72,
+    "n_tier1_series": 1573,
+    "passes_coverage": true,
+    "per_family_covered": {
+      "map_winner": 72,
+      "series_winner": 0
+    }
+  },
+  "depth_gate_pass": null,
+  "depth_live_polymarket": {
+    "in_game": {
+      "median_usd": null,
+      "n": 0,
+      "note": "no live two-sided book observed",
+      "regime": "in_game",
+      "source": "live",
+      "venue": "polymarket"
+    },
+    "pre_match": {
+      "median_usd": null,
+      "n": 0,
+      "note": "no live two-sided book observed",
+      "regime": "pre_match",
+      "source": "live",
+      "venue": "polymarket"
+    }
+  },
+  "frozen_rules": {
+    "families_phase1": [
+      "series_winner",
+      "map_winner"
+    ],
+    "min_covered_matches": 60,
+    "min_depth_usd_per_side": 250.0,
+    "tier1_oe_leagues": [
+      "LCK",
+      "LPL",
+      "LEC",
+      "LCS",
+      "LTA",
+      "LCP",
+      "MSI",
+      "WLDs"
+    ],
+    "window_start": "2025-01-01T00:00:00.000Z"
+  },
+  "gate": "G0",
+  "per_family_verdict": {
+    "map_winner": {
+      "both_venues_exist": true,
+      "go_to_G1": true,
+      "n_covered": 72
+    },
+    "series_winner": {
+      "both_venues_exist": true,
+      "go_to_G1": false,
+      "n_covered": 0
+    }
+  },
+  "polymarket_sweep": {
+    "in_window_truncated": true,
+    "n_records": 10974,
+    "oldest_ts": "2026-01-20T00:00:00.000Z",
+    "pagination_capped": true
+  }
+}

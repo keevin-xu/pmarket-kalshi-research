@@ -1,0 +1,23 @@
+{
+  "agreement_rate": 1.0,
+  "caveats": [
+    "OE is the neutral arbiter; venue-vs-venue agreement is the gate, venue-vs-OE is corroboration.",
+    "resolution source differs (Kalshi governing-league result vs Polymarket UMA/gol.gg) \u2014 a documented caveat, not a fail, given result agreement + void consistency hold."
+  ],
+  "disagreements_sample": [],
+  "family": "map_winner",
+  "frozen_rules": {
+    "min_aligned_maps": 30,
+    "min_family_pass_rate": 0.95
+  },
+  "gate": "G1",
+  "n_agree": 189,
+  "n_aligned_played_maps": 189,
+  "n_void_breaks": 0,
+  "oe_agreement": {
+    "kalshi": 1.0,
+    "polymarket": 1.0
+  },
+  "passed_gate": true,
+  "verdict": "PASS \u2014 same claim"
+}

@@ -1,8 +1,8 @@
 """Settlement-parity unit tests + lead-lag still-pending marker."""
 import pytest
 
-from parity import settlement
-from reference import lead_lag
+from core.parity import settlement
+from core.reference import lead_lag
 
 
 def _rec(teams, day, map_no, winner):

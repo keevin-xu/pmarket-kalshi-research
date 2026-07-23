@@ -1,4 +1,4 @@
-from census import population as pop
+from sports.lol import population as pop
 
 
 def test_props_excluded():

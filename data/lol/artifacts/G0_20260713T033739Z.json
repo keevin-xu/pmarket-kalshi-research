@@ -1,0 +1,101 @@
+{
+  "caveats": [
+    "coverage counts SERIES ((team-pair, day)); OE gameid is per-map.",
+    "depth is LIVE-only (settled books are gone at resolution); a null median means no open two-sided LoL book at run time, NOT zero depth.",
+    "series_winner on Kalshi (KXLOL) had 0 settled markets at recon."
+  ],
+  "coverage": {
+    "coverage_pct": 0.008264462809917356,
+    "covered_match_ids": [
+      "LOLTMNT01_378734",
+      "LOLTMNT04_161335",
+      "LOLTMNT02_407714",
+      "LOLTMNT05_195244",
+      "LOLTMNT02_416423",
+      "LOLTMNT05_196548",
+      "LOLTMNT02_417420",
+      "LOLTMNT01_399193",
+      "LOLTMNT02_417498",
+      "LOLTMNT05_195683",
+      "LOLTMNT01_404715",
+      "13296-13296_game_1",
+      "LOLTMNT01_405807"
+    ],
+    "existence": {
+      "kalshi": [
+        "map_winner",
+        "series_winner"
+      ],
+      "polymarket": [
+        "map_winner",
+        "series_winner"
+      ]
+    },
+    "gate_min_covered": 60,
+    "n_covered": 13,
+    "n_tier1_series": 1573,
+    "passes_coverage": false,
+    "per_family_covered": {
+      "map_winner": 13,
+      "series_winner": 0
+    }
+  },
+  "depth_gate_pass": null,
+  "depth_live_polymarket": {
+    "_error": "live depth sweep failed: IntegrityError('FOREIGN KEY constraint failed')",
+    "in_game": {
+      "median_usd": null,
+      "n": 0,
+      "note": "no live two-sided book observed",
+      "regime": "in_game",
+      "source": "live",
+      "venue": "polymarket"
+    },
+    "pre_match": {
+      "median_usd": null,
+      "n": 0,
+      "note": "no live two-sided book observed",
+      "regime": "pre_match",
+      "source": "live",
+      "venue": "polymarket"
+    }
+  },
+  "frozen_rules": {
+    "families_phase1": [
+      "series_winner",
+      "map_winner"
+    ],
+    "min_covered_matches": 60,
+    "min_depth_usd_per_side": 250.0,
+    "tier1_oe_leagues": [
+      "LCK",
+      "LPL",
+      "LEC",
+      "LCS",
+      "LTA",
+      "LCP",
+      "MSI",
+      "WLDs"
+    ],
+    "window_start": "2025-01-01T00:00:00.000Z"
+  },
+  "gate": "G0",
+  "per_family_verdict": {
+    "map_winner": {
+      "both_venues_exist": true,
+      "go_to_G1": false,
+      "n_covered": 13
+    },
+    "series_winner": {
+      "both_venues_exist": true,
+      "go_to_G1": false,
+      "n_covered": 0
+    }
+  },
+  "polymarket_sweep": {
+    "in_window_truncated": true,
+    "n_records": 24390,
+    "oldest_ts": "2026-01-06T11:09:58.980Z",
+    "pagination_capped": true
+  }
+}

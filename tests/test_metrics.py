@@ -1,6 +1,6 @@
 import statistics
 
-from analysis import metrics
+from core.analysis import metrics
 
 
 def test_brier_and_ece_perfect_calibration():

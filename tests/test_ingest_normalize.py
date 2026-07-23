@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import csv
 
-from census import population as pop
-from ingest.kalshi import KalshiAdapter
-from ingest.polymarket import PolymarketAdapter
-from ingest.outcomes import OutcomesAdapter
+from sports.lol import population as pop
+from core.ingest.kalshi import KalshiAdapter
+from core.ingest.polymarket import PolymarketAdapter
+from sports.lol.outcomes import OutcomesAdapter
 
 
 # --- Kalshi: order book -> mid, NO de-vig, depth in $ --------------------------

@@ -1,6 +1,6 @@
 # METHODOLOGY.md — calibration & lead-lag, in depth
 
-This is the conceptual core. Code in `reference/` implements it.
+This is the conceptual core. Code in `core/reference/` implements it.
 
 ## Why two tests, and why neither alone is enough
 

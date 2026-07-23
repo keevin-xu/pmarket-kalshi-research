@@ -1,0 +1,29 @@
+[Unit]
+# Templated: one recorder per sport. %i = sport key (lol, cs2, ...).
+#   sudo systemctl enable --now pmk-recorder@lol
+#   sudo systemctl enable --now pmk-recorder@cs2
+# A crash or quota-death in one sport's unit cannot touch another's data.
+Description=pmarket-kalshi-research live book recorder (observe-only) [%i]
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# --- edit these two for your host ---
+User=pmk
+WorkingDirectory=/opt/pmarket-kalshi-research
+# --------------------------------------
+ExecStart=/opt/pmarket-kalshi-research/.venv/bin/python -m core.ingest.record --sport %i
+EnvironmentFile=-/opt/pmarket-kalshi-research/.env
+Restart=on-failure
+RestartSec=10
+# journald: `journalctl -u pmk-recorder@%i -f`
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+ProtectSystem=strict
+# each sport writes only under its own data/<sport> tree
+ReadWritePaths=/opt/pmarket-kalshi-research/data/%i
+
+[Install]
+WantedBy=multi-user.target

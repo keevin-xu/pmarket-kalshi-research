@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from db import store
+from core.db import store
 
 
 @pytest.fixture

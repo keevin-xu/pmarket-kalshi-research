@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import pytest
 
-from db import store
-from ingest.base import VendorError
-from ingest import record
+from core.db import store
+from core.ingest.base import VendorError
+from core.ingest import record
+from sports.lol import LolSport
+
+SPORT = LolSport()
 
 
 @pytest.fixture
@@ -64,7 +67,7 @@ class _FakePoly:
         self.raise_book = raise_book
         self.book_status = book_status
 
-    def iter_events(self, *, closed=None):
+    def iter_events(self, tag, *, closed=None):
         return [{"title": "LoL: Gen.G vs T1 (BO3) - LCK Round 3-4",
                  "slug": "lol-geng-t1-2026-07-23",
                  "startDate": "2026-07-23T08:00:00Z",
@@ -95,7 +98,7 @@ class _FakeKalshi:
 
 
 def test_poll_cycle_writes_both_venues(conn):
-    n = record.Recorder(conn, _FakeKalshi(), _FakePoly()).poll_cycle()
+    n = record.Recorder(conn, SPORT, _FakeKalshi(), _FakePoly()).poll_cycle()
     assert n == 2
     venues = {r[0] for r in conn.execute("SELECT DISTINCT venue FROM book_snapshots")}
     assert venues == {"polymarket", "kalshi"}
@@ -104,7 +107,7 @@ def test_poll_cycle_writes_both_venues(conn):
 
 
 def test_circuit_breaker_trips_on_429(conn):
-    rec = record.Recorder(conn, _FakeKalshi(), _FakePoly(raise_book=True, book_status=429))
+    rec = record.Recorder(conn, SPORT, _FakeKalshi(), _FakePoly(raise_book=True, book_status=429))
     rec.poll_cycle()
     assert rec._blocked("polymarket")            # 429 armed the cooldown
     assert not rec._blocked("kalshi")            # other venue unaffected
@@ -114,6 +117,6 @@ def test_circuit_breaker_trips_on_429(conn):
 
 def test_404_is_a_gap_not_a_trip(conn):
     # a per-market 404 must skip that market, NOT circuit-break the venue
-    rec = record.Recorder(conn, _FakeKalshi(), _FakePoly(raise_book=True, book_status=404))
+    rec = record.Recorder(conn, SPORT, _FakeKalshi(), _FakePoly(raise_book=True, book_status=404))
     rec.poll_cycle()
     assert not rec._blocked("polymarket")

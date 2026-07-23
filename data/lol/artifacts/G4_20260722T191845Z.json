@@ -1,0 +1,40 @@
+{
+  "bounded_verdict_date": "2026-09-30",
+  "gate": "G4",
+  "regimes": {
+    "in_game": {
+      "calibration_pass": true,
+      "kalshi_ece": 0.10158102766798421,
+      "lead_pass": true,
+      "leader": "kalshi",
+      "n_divergences": 201,
+      "parity_pass": true,
+      "poly_ece": 0.2044609375,
+      "reference_valid": true,
+      "tradeable": false
+    },
+    "pre_match": {
+      "calibration_pass": true,
+      "kalshi_ece": 0.11575098814229248,
+      "lead_pass": false,
+      "leader": null,
+      "n_divergences": 264,
+      "parity_pass": true,
+      "poly_ece": 0.160390625,
+      "reference_valid": false,
+      "tradeable": false
+    }
+  },
+  "traces": {
+    "calibration": null,
+    "census": null,
+    "lead_lag": null,
+    "parity": null
+  },
+  "tradeability_blockers": [
+    "Polymarket depth below the $250/side floor (capacity)",
+    "no live-recorder corroboration (historical-only)",
+    "thin ~1-month sample (Polymarket price-history retention)"
+  ],
+  "verdict": "CONDITIONAL \u2014 reference valid but not yet tradeable"
+}

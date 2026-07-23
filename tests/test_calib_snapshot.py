@@ -1,7 +1,7 @@
 """Calibration snapshot helpers: no-lookahead price-at-target, from tiny
 synthetic series. Order-book mid, NO de-vig."""
-from ingest.kalshi import KalshiAdapter
-from reference.calib_data import _pm_price_at
+from core.ingest.kalshi import KalshiAdapter
+from core.reference.calib_data import _pm_price_at
 
 
 def _candle(ts, bid, ask):

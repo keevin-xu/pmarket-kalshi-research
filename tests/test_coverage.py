@@ -2,7 +2,10 @@
 and the both-venues n_covered gate. Deterministic, no network."""
 from __future__ import annotations
 
-from census import coverage as cov
+from core.census import coverage as cov
+from sports.lol.params import LOL_PARAMS
+
+CP = LOL_PARAMS.census
 
 
 def test_team_match_abbreviations_and_suffixes():
@@ -39,7 +42,7 @@ def test_coverage_requires_both_venues():
         {"teams": ("Bilibili Gaming", "HLE"),
          "ts": "2026-07-12T04:00:00.000Z", "family": "map_winner", "contract_id": "p1"},
     ]
-    rep = cov.coverage_report(oe, {"kalshi": kalshi, "polymarket": poly})
+    rep = cov.coverage_report(oe, {"kalshi": kalshi, "polymarket": poly}, CP)
     assert rep["n_tier1_series"] == 2
     assert rep["n_covered"] == 1          # only g1 is on BOTH venues
     assert "g1" in rep["covered_match_ids"] and "g2" not in rep["covered_match_ids"]
@@ -56,6 +59,6 @@ def test_series_collapse_counts_once():
     ]
     v = [{"teams": ("T1", "Gen.G"), "ts": "2026-07-10T08:30:00.000Z",
           "family": "map_winner", "contract_id": "x"}]
-    rep = cov.coverage_report(oe, {"kalshi": v, "polymarket": v})
+    rep = cov.coverage_report(oe, {"kalshi": v, "polymarket": v}, CP)
     assert rep["n_tier1_series"] == 1
     assert rep["n_covered"] == 1

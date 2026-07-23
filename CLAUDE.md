@@ -1,15 +1,26 @@
 # CLAUDE.md — hard invariants for `pmarket-kalshi-research`
 
-Read this and `DECISIONS.md` end-to-end before writing any code. This
-file lists rules that must never be violated. `SPEC.md` says what we're
-building; `DECISIONS.md` is the append-only ledger of pre-registered
-thresholds and rulings and is the project's actual history. Where this
-file and `DECISIONS.md` disagree, `DECISIONS.md` wins for anything it
-has explicitly ruled on.
+Read this and the relevant sport's `sports/<sport>/DECISIONS.md` end-to-end
+before writing any code. This file lists rules that must never be violated.
+`SPEC.md` says what we're building; each sport's `DECISIONS.md` is its
+append-only ledger of pre-registered thresholds and rulings and is that
+sport's actual history. Where this file and a sport's `DECISIONS.md`
+disagree, the ledger wins for anything it has explicitly ruled on.
 
 This project inherits the `polymarket-edge-finder` methodology
 (v1.1). The rules below are the subset that are non-negotiable for
 *this* project.
+
+## Repo shape (multi-sport)
+
+A **sport-agnostic `core/` engine** drives **per-sport plugins**
+(`sports/<sport>/`, e.g. `sports/lol/`) behind the `Sport` interface
+(`core/sport.py`). No module in `core/` names a sport. Each sport owns its
+**frozen params** (`sports/<sport>/params.py`), its **own** ledger
+(`sports/<sport>/DECISIONS.md`), and its **own isolated data**
+(`data/<sport>/`). One sport's frozen numbers NEVER bind another; each
+freezes on its own first real run. Gates run per sport:
+`python -m engine.run --sport <sport> --gate GN`.
 
 ## 0. What this project is
 
@@ -42,9 +53,10 @@ project *could*.
 
 ## 2. Governance before code
 
-- **Pre-register everything judgeable in `DECISIONS.md` before the data
-  that would be judged by it exists.** Thresholds, decision metrics,
-  and the *exact population* they apply to. Date every entry.
+- **Pre-register everything judgeable in the sport's `DECISIONS.md`
+  before the data that would be judged by it exists.** Thresholds,
+  decision metrics, and the *exact population* they apply to. Date every
+  entry. Each sport pre-registers in its OWN ledger.
 - **Freeze kill criteria on the first real run.** After that:
   measurement bugs may be fixed; thresholds may not be touched.
   Changing a frozen threshold requires an explicit human ruling
@@ -64,17 +76,17 @@ before these pass is producing confident, wrong numbers.
 - **Reference-validation gate.** A venue may not be used as "truth"
   until it passes BOTH calibration and (for lead-lag signals) leads the
   traded venue. See `SPEC.md` §Reference validation and
-  `reference/`. Grading CLV against an un-validated reference is
+  `core/reference/`. Grading CLV against an un-validated reference is
   forbidden.
 - **Settlement-parity gate.** No number crosses venues until the two
   contracts are proven the *same claim* per market family
-  (`parity/settlement.py`). A comparison across non-identical claims is
-  a mapping bug, not a market result.
+  (`core/parity/settlement.py`). A comparison across non-identical claims
+  is a mapping bug, not a market result.
 
 ## 4. Data invariants (enforced by the leakage canary)
 
 - **Strict `ts < asof` on every read**, through the one shared helper in
-  `db/store.py`. No ad-hoc date filters in analysis or signal code.
+  `core/db/store.py`. No ad-hoc date filters in analysis or signal code.
   Anything *fitted* (e.g. a recalibration curve) is also subject to
   this — fitting on data at/after `asof` is the classic silent leak.
 - **The leakage canary (`tests/test_leakage.py`) must be green on every
@@ -94,8 +106,10 @@ before these pass is producing confident, wrong numbers.
   side, not a zero. A missing market is a reported failure.
 - **Idempotent ingestion**: natural keys + upsert; re-ingesting
   unchanged input changes nothing.
-- **All tunables in `config.py`.** A magic number in analysis or signal
-  code is a bug. Prices/probabilities live in [0,1]; convert odds at the
+- **All tunables in config, none in code.** Global cross-sport constants
+  in `core/config.py`; per-sport frozen thresholds in
+  `sports/<sport>/params.py`. A magic number in analysis or signal code
+  is a bug. Prices/probabilities live in [0,1]; convert odds at the
   ingestion boundary only.
 
 ## 5. Reference math (do not misapply the de-vig)
@@ -104,8 +118,8 @@ before these pass is producing confident, wrong numbers.
   `p_i = q_i / Σq_j` of *raw* odds, identical on hist and live.
 - **Order-book venue reference (Kalshi, or Polymarket-as-reference):**
   there is **no vig** — the two sides already sum to ~1. Use the **mid**
-  (or last), chosen once in `config.py`. **Never run an order book
-  through the de-vig formula.**
+  (or last), chosen once in the sport's `params.py`. **Never run an order
+  book through the de-vig formula.**
 - One method per reference type, across all phases, or the metric isn't
   one metric.
 
@@ -135,7 +149,7 @@ before these pass is producing confident, wrong numbers.
 - Run `pytest -q` before and after every change; the leakage canary
   must stay green.
 - If a vendor API contradicts the spec, adapt the ingest layer, keep
-  the internal schema stable, and note it in `DECISIONS.md`.
+  the internal schema stable, and note it in the sport's `DECISIONS.md`.
 - When a verdict is contested, don't argue with the data — write the
   ruling down and follow it.
 - Never write execution/wallet code. (Repeated because it matters.)

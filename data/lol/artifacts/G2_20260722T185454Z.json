@@ -1,0 +1,544 @@
+{
+  "caveats": [
+    "one point per map (Blue-side team); price = P(team_a wins), outcome from Oracle's Elixir (neutral).",
+    "pre_match = mid at kickoff; in_game = mid at kickoff+600s (10-min game clock), maps with gamelen>=600s only.",
+    "prices are order-book mid (Kalshi) / last (Polymarket), NO de-vig."
+  ],
+  "family": "map_winner",
+  "frozen_rules": {
+    "buckets": [
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9,
+      0.95
+    ],
+    "metric": "ECE",
+    "min_sample": 50,
+    "pass_margin": 0.0
+  },
+  "gate": "G2",
+  "n_points_total": 634,
+  "regimes": {
+    "in_game": {
+      "kalshi": {
+        "brier": 0.20897786561264822,
+        "brier_ci": {
+          "hi": 0.2347433794466403,
+          "lo": 0.1842090909090909,
+          "n_blocks": 253
+        },
+        "ece": 0.10158102766798421,
+        "log_loss": 0.6060968758826524,
+        "n": 253,
+        "regime": "in_game",
+        "reliability_curve": [
+          {
+            "bucket": 0.05,
+            "mean_price": 0.05666666666666667,
+            "n": 3,
+            "realized_rate": 0.0
+          },
+          {
+            "bucket": 0.1,
+            "mean_price": 0.09000000000000001,
+            "n": 6,
+            "realized_rate": 0.16666666666666666
+          },
+          {
+            "bucket": 0.15,
+            "mean_price": 0.15192307692307694,
+            "n": 13,
+            "realized_rate": 0.23076923076923078
+          },
+          {
+            "bucket": 0.2,
+            "mean_price": 0.20714285714285713,
+            "n": 14,
+            "realized_rate": 0.2857142857142857
+          },
+          {
+            "bucket": 0.25,
+            "mean_price": 0.24653846153846154,
+            "n": 13,
+            "realized_rate": 0.3076923076923077
+          },
+          {
+            "bucket": 0.3,
+            "mean_price": 0.29264705882352937,
+            "n": 17,
+            "realized_rate": 0.23529411764705882
+          },
+          {
+            "bucket": 0.35,
+            "mean_price": 0.35,
+            "n": 9,
+            "realized_rate": 0.7777777777777778
+          },
+          {
+            "bucket": 0.4,
+            "mean_price": 0.39825,
+            "n": 20,
+            "realized_rate": 0.45
+          },
+          {
+            "bucket": 0.45,
+            "mean_price": 0.45272727272727276,
+            "n": 11,
+            "realized_rate": 0.45454545454545453
+          },
+          {
+            "bucket": 0.5,
+            "mean_price": 0.4988235294117647,
+            "n": 17,
+            "realized_rate": 0.7058823529411765
+          },
+          {
+            "bucket": 0.55,
+            "mean_price": 0.5505555555555556,
+            "n": 18,
+            "realized_rate": 0.7777777777777778
+          },
+          {
+            "bucket": 0.6,
+            "mean_price": 0.6125,
+            "n": 16,
+            "realized_rate": 0.5625
+          },
+          {
+            "bucket": 0.65,
+            "mean_price": 0.6471875,
+            "n": 16,
+            "realized_rate": 0.625
+          },
+          {
+            "bucket": 0.7,
+            "mean_price": 0.7043333333333333,
+            "n": 15,
+            "realized_rate": 0.8
+          },
+          {
+            "bucket": 0.75,
+            "mean_price": 0.74625,
+            "n": 16,
+            "realized_rate": 0.6875
+          },
+          {
+            "bucket": 0.8,
+            "mean_price": 0.8065,
+            "n": 10,
+            "realized_rate": 0.8
+          },
+          {
+            "bucket": 0.85,
+            "mean_price": 0.8571875,
+            "n": 16,
+            "realized_rate": 0.625
+          },
+          {
+            "bucket": 0.9,
+            "mean_price": 0.90625,
+            "n": 4,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.95,
+            "mean_price": 0.9460526315789475,
+            "n": 19,
+            "realized_rate": 0.8947368421052632
+          }
+        ],
+        "venue": "kalshi"
+      },
+      "kalshi_calibrated_vs_poly": true,
+      "margin": 0.0,
+      "passed": true,
+      "polymarket": {
+        "brier": 0.19395453515625,
+        "brier_ci": {
+          "hi": 0.24390766015624998,
+          "lo": 0.14800023828125,
+          "n_blocks": 64
+        },
+        "ece": 0.2044609375,
+        "log_loss": 0.566925026249003,
+        "n": 64,
+        "regime": "in_game",
+        "reliability_curve": [
+          {
+            "bucket": 0.05,
+            "mean_price": 0.075,
+            "n": 1,
+            "realized_rate": 0.0
+          },
+          {
+            "bucket": 0.1,
+            "mean_price": 0.09,
+            "n": 2,
+            "realized_rate": 0.5
+          },
+          {
+            "bucket": 0.15,
+            "mean_price": 0.155,
+            "n": 1,
+            "realized_rate": 0.0
+          },
+          {
+            "bucket": 0.2,
+            "mean_price": 0.195,
+            "n": 1,
+            "realized_rate": 0.0
+          },
+          {
+            "bucket": 0.25,
+            "mean_price": 0.2475,
+            "n": 2,
+            "realized_rate": 0.0
+          },
+          {
+            "bucket": 0.3,
+            "mean_price": 0.29874999999999996,
+            "n": 4,
+            "realized_rate": 0.75
+          },
+          {
+            "bucket": 0.35,
+            "mean_price": 0.355,
+            "n": 3,
+            "realized_rate": 0.6666666666666666
+          },
+          {
+            "bucket": 0.4,
+            "mean_price": 0.395,
+            "n": 4,
+            "realized_rate": 0.75
+          },
+          {
+            "bucket": 0.45,
+            "mean_price": 0.475,
+            "n": 2,
+            "realized_rate": 0.5
+          },
+          {
+            "bucket": 0.5,
+            "mean_price": 0.5083333333333333,
+            "n": 6,
+            "realized_rate": 0.3333333333333333
+          },
+          {
+            "bucket": 0.55,
+            "mean_price": 0.5625,
+            "n": 8,
+            "realized_rate": 0.375
+          },
+          {
+            "bucket": 0.6,
+            "mean_price": 0.6183333333333333,
+            "n": 3,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.65,
+            "mean_price": 0.6575,
+            "n": 2,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.7,
+            "mean_price": 0.6916666666666668,
+            "n": 3,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.75,
+            "mean_price": 0.745,
+            "n": 5,
+            "realized_rate": 0.8
+          },
+          {
+            "bucket": 0.8,
+            "mean_price": 0.815,
+            "n": 3,
+            "realized_rate": 0.6666666666666666
+          },
+          {
+            "bucket": 0.85,
+            "mean_price": 0.8625,
+            "n": 2,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.9,
+            "mean_price": 0.91,
+            "n": 3,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.95,
+            "mean_price": 0.9517222222222222,
+            "n": 9,
+            "realized_rate": 0.8888888888888888
+          }
+        ],
+        "venue": "polymarket"
+      },
+      "regime": "in_game",
+      "verdict": "PASS \u2014 Kalshi at least as calibrated"
+    },
+    "pre_match": {
+      "kalshi": {
+        "brier": 0.2251447628458498,
+        "brier_ci": {
+          "hi": 0.2458669960474308,
+          "lo": 0.20458438735177867,
+          "n_blocks": 253
+        },
+        "ece": 0.11575098814229248,
+        "log_loss": 0.6391418644683191,
+        "n": 253,
+        "regime": "pre_match",
+        "reliability_curve": [
+          {
+            "bucket": 0.1,
+            "mean_price": 0.125,
+            "n": 1,
+            "realized_rate": 0.0
+          },
+          {
+            "bucket": 0.15,
+            "mean_price": 0.135,
+            "n": 1,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.2,
+            "mean_price": 0.20111111111111113,
+            "n": 9,
+            "realized_rate": 0.0
+          },
+          {
+            "bucket": 0.25,
+            "mean_price": 0.2521875,
+            "n": 16,
+            "realized_rate": 0.3125
+          },
+          {
+            "bucket": 0.3,
+            "mean_price": 0.3018181818181818,
+            "n": 11,
+            "realized_rate": 0.45454545454545453
+          },
+          {
+            "bucket": 0.35,
+            "mean_price": 0.3501785714285714,
+            "n": 28,
+            "realized_rate": 0.4642857142857143
+          },
+          {
+            "bucket": 0.4,
+            "mean_price": 0.4019230769230769,
+            "n": 13,
+            "realized_rate": 0.38461538461538464
+          },
+          {
+            "bucket": 0.45,
+            "mean_price": 0.4525,
+            "n": 22,
+            "realized_rate": 0.6818181818181818
+          },
+          {
+            "bucket": 0.5,
+            "mean_price": 0.4984615384615385,
+            "n": 26,
+            "realized_rate": 0.5
+          },
+          {
+            "bucket": 0.55,
+            "mean_price": 0.5528260869565217,
+            "n": 23,
+            "realized_rate": 0.6956521739130435
+          },
+          {
+            "bucket": 0.6,
+            "mean_price": 0.6002083333333333,
+            "n": 24,
+            "realized_rate": 0.4166666666666667
+          },
+          {
+            "bucket": 0.65,
+            "mean_price": 0.6463333333333333,
+            "n": 15,
+            "realized_rate": 0.7333333333333333
+          },
+          {
+            "bucket": 0.7,
+            "mean_price": 0.6997222222222221,
+            "n": 18,
+            "realized_rate": 0.8333333333333334
+          },
+          {
+            "bucket": 0.75,
+            "mean_price": 0.7576315789473684,
+            "n": 19,
+            "realized_rate": 0.6842105263157895
+          },
+          {
+            "bucket": 0.8,
+            "mean_price": 0.8029999999999999,
+            "n": 10,
+            "realized_rate": 0.8
+          },
+          {
+            "bucket": 0.85,
+            "mean_price": 0.84875,
+            "n": 8,
+            "realized_rate": 0.625
+          },
+          {
+            "bucket": 0.9,
+            "mean_price": 0.90375,
+            "n": 4,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.95,
+            "mean_price": 0.933,
+            "n": 5,
+            "realized_rate": 1.0
+          }
+        ],
+        "venue": "kalshi"
+      },
+      "kalshi_calibrated_vs_poly": true,
+      "margin": 0.0,
+      "passed": true,
+      "polymarket": {
+        "brier": 0.206101953125,
+        "brier_ci": {
+          "hi": 0.2526109375,
+          "lo": 0.161579296875,
+          "n_blocks": 64
+        },
+        "ece": 0.160390625,
+        "log_loss": 0.5897663467948301,
+        "n": 64,
+        "regime": "pre_match",
+        "reliability_curve": [
+          {
+            "bucket": 0.15,
+            "mean_price": 0.145,
+            "n": 1,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.2,
+            "mean_price": 0.195,
+            "n": 2,
+            "realized_rate": 0.0
+          },
+          {
+            "bucket": 0.25,
+            "mean_price": 0.253,
+            "n": 5,
+            "realized_rate": 0.4
+          },
+          {
+            "bucket": 0.3,
+            "mean_price": 0.295,
+            "n": 4,
+            "realized_rate": 0.5
+          },
+          {
+            "bucket": 0.35,
+            "mean_price": 0.333,
+            "n": 5,
+            "realized_rate": 0.6
+          },
+          {
+            "bucket": 0.4,
+            "mean_price": 0.425,
+            "n": 1,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.45,
+            "mean_price": 0.461,
+            "n": 5,
+            "realized_rate": 0.6
+          },
+          {
+            "bucket": 0.5,
+            "mean_price": 0.509,
+            "n": 5,
+            "realized_rate": 0.4
+          },
+          {
+            "bucket": 0.55,
+            "mean_price": 0.5566666666666666,
+            "n": 6,
+            "realized_rate": 0.6666666666666666
+          },
+          {
+            "bucket": 0.6,
+            "mean_price": 0.615,
+            "n": 4,
+            "realized_rate": 0.25
+          },
+          {
+            "bucket": 0.65,
+            "mean_price": 0.645,
+            "n": 1,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.7,
+            "mean_price": 0.6825,
+            "n": 4,
+            "realized_rate": 0.75
+          },
+          {
+            "bucket": 0.75,
+            "mean_price": 0.7528571428571428,
+            "n": 7,
+            "realized_rate": 0.8571428571428571
+          },
+          {
+            "bucket": 0.8,
+            "mean_price": 0.805,
+            "n": 5,
+            "realized_rate": 0.8
+          },
+          {
+            "bucket": 0.85,
+            "mean_price": 0.8649999999999999,
+            "n": 3,
+            "realized_rate": 1.0
+          },
+          {
+            "bucket": 0.95,
+            "mean_price": 0.9316666666666666,
+            "n": 6,
+            "realized_rate": 1.0
+          }
+        ],
+        "venue": "polymarket"
+      },
+      "regime": "pre_match",
+      "verdict": "PASS \u2014 Kalshi at least as calibrated"
+    }
+  }
+}

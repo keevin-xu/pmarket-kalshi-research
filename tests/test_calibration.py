@@ -1,5 +1,5 @@
-from reference.calibration import CalibrationPoint, calibration_report, compare_venues
-from config import CONFIG
+from core.reference.calibration import CalibrationPoint, calibration_report, compare_venues
+from core.config import CONFIG
 
 
 def _pts(venue, regime, data):

@@ -1,0 +1,41 @@
+{
+  "bounded_verdict_date": "2026-09-30",
+  "gate": "G4",
+  "regimes": {
+    "in_game": {
+      "calibration_pass": true,
+      "kalshi_ece": 0.10158102766798421,
+      "lead_pass": true,
+      "leader": "kalshi",
+      "n_divergences": 201,
+      "parity_pass": true,
+      "poly_ece": 0.2044609375,
+      "reference_valid": true,
+      "tradeable": false
+    },
+    "pre_match": {
+      "calibration_pass": true,
+      "kalshi_ece": 0.11575098814229248,
+      "lead_pass": false,
+      "leader": null,
+      "n_divergences": 264,
+      "parity_pass": true,
+      "poly_ece": 0.160390625,
+      "reference_valid": false,
+      "tradeable": false
+    }
+  },
+  "sport": "lol",
+  "traces": {
+    "calibration": "/Users/kevinxu/Documents/my-random-documents/projects/lol-project-ALL-FILES/pmarket-kalshi-research/data/lol/artifacts/G2_20260722T185454Z.json",
+    "census": "/Users/kevinxu/Documents/my-random-documents/projects/lol-project-ALL-FILES/pmarket-kalshi-research/data/lol/artifacts/G0_20260722T191813Z.json",
+    "lead_lag": "/Users/kevinxu/Documents/my-random-documents/projects/lol-project-ALL-FILES/pmarket-kalshi-research/data/lol/artifacts/G3_20260722T190614Z.json",
+    "parity": "/Users/kevinxu/Documents/my-random-documents/projects/lol-project-ALL-FILES/pmarket-kalshi-research/data/lol/artifacts/G1_20260723T201713Z.json"
+  },
+  "tradeability_blockers": [
+    "Polymarket depth below the $250/side floor (capacity)",
+    "no live-recorder corroboration (historical-only)",
+    "thin ~1-month sample (Polymarket price-history retention)"
+  ],
+  "verdict": "CONDITIONAL \u2014 reference valid but not yet tradeable"
+}

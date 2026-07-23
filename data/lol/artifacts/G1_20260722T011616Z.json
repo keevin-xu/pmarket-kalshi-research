@@ -1,0 +1,132 @@
+{
+  "agreement_rate": 1.0,
+  "caveats": [
+    "OE is the neutral arbiter; venue-vs-venue agreement is the gate, venue-vs-OE is corroboration.",
+    "resolution source differs (Kalshi governing-league result vs Polymarket UMA/gol.gg) \u2014 a documented caveat, not a fail, given result agreement + void consistency hold."
+  ],
+  "disagreements_sample": [
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "FlyQuest",
+        "Sentinels"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "FlyQuest",
+        "Sentinels"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "FlyQuest",
+        "Sentinels"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "FlyQuest",
+        "Sentinels"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "FlyQuest",
+        "Sentinels"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "FlyQuest",
+        "Sentinels"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "BNK FearX Youth",
+        "Gen.G Global Academy"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "BNK FearX Youth",
+        "Gen.G Global Academy"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "BNK FearX Youth",
+        "Gen.G Global Academy"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "BNK FearX Youth",
+        "Gen.G Global Academy"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "BNK FearX Youth",
+        "Gen.G Global Academy"
+      ],
+      "venue": "polymarket"
+    },
+    {
+      "kind": "void_break",
+      "map_no": 3,
+      "teams": [
+        "BNK FearX Youth",
+        "Gen.G Global Academy"
+      ],
+      "venue": "polymarket"
+    }
+  ],
+  "family": "map_winner",
+  "frozen_rules": {
+    "min_aligned_maps": 30,
+    "min_family_pass_rate": 0.95
+  },
+  "gate": "G1",
+  "n_agree": 189,
+  "n_aligned_played_maps": 189,
+  "n_void_breaks": 12,
+  "oe_agreement": {
+    "kalshi": 1.0,
+    "polymarket": 1.0
+  },
+  "passed_gate": false,
+  "verdict": "FAIL \u2014 claims differ / void mismatch"
+}

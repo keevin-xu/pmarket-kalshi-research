@@ -1,68 +1,66 @@
 # SYSTEM_OVERVIEW.md — how the code fits together
 
 A narrative map of the pipeline. Data flows top to bottom; each gate is a
-human review point.
+human review point. The engine is **sport-agnostic** (`core/`); everything
+sport-specific is a plugin (`sports/<sport>/`) behind the `Sport` interface.
 
 ```
-            NEUTRAL SCHEDULE / RESULTS (Oracle's Elixir / PandaScore)
+   sports/<sport>/  ── the plugin: classify_family/is_prop/is_tier1,
+   (e.g. sports/lol) discovery (Polymarket tag + Kalshi tickers), neutral
+        │            outcomes (load_matches/load_map_results), FROZEN params
+        │            (params.py) + its own DECISIONS.md.  engine passes `sport`.
+        ▼
+            NEUTRAL SCHEDULE / RESULTS  (sport.load_matches — e.g. Oracle's Elixir)
                           │  (the answer key + coverage check)
                           ▼
-  ingest/polymarket.py ┐        ┌ ingest/kalshi.py
-   (Gamma/CLOB/Data)   ├─ ingest/base.py ─┤  (trade-api v2, mid/last, NO de-vig)
-   ingest/record.py  ──┘  UTC, fixed-width ts, idempotent upsert, cursors
+ core/ingest/polymarket.py ┐      ┌ core/ingest/kalshi.py
+    (Gamma/CLOB/Data)      ├─ core/ingest/base.py ─┤ (trade-api v2, mid/last, NO de-vig)
+    core/ingest/record.py ─┘  UTC, fixed-width ts, idempotent upsert, cursors
                           │
                           ▼
-                   db/store.py  ── the ONE point-in-time read helper
-                   db/schema.sql   (strict ts < asof; provenance + venue cols)
+               core/db/store.py  ── the ONE point-in-time read helper
+               core/db/schema.sql   (strict ts < asof; provenance + venue cols)
                           │
         ┌─────────────────┼───────────────────────────┐
         ▼                 ▼                            ▼
- census/population.py  parity/settlement.py     reference/calibration.py
- census/depth.py       (GATE G1: same claim     (GATE G2: is the price true?
- (GATE G0: population,  per market family)        per venue, per regime,
-  depth@signal-moment)                            vs NEUTRAL outcomes)
-                                                        │
-                                                 reference/lead_lag.py
-                                                 (GATE G3: does it lead?
-                                                  per regime, diverged pairs)
+ core/census/*        core/parity/settlement.py  core/reference/calibration.py
+ (G0: coverage +      (G1: same claim per         (G2: is the price true?
+  depth@signal;        market family)              per venue/regime, vs NEUTRAL)
+  predicate=sport.*)                                     │
+                                                  core/reference/lead_lag.py
+                                                  (G3: does it lead? per regime)
                           │
                           ▼
-              analysis/metrics.py  (event-block bootstrap, seeded;
-                                    calibration error, lead statistics)
+              core/analysis/metrics.py  (event-block bootstrap, seeded)
                           │
                           ▼
-              analysis/report.py   (GATE G4: verdict-first —
-                                    verdict, n, CI, caveat flags)
+              core/analysis/report.py   (G4: verdict-first — verdict, n, CI, flags)
                           ▲
-              engine/run.py orchestrates the whole chain and stops at gates
+    engine/run.py --sport <s> --gate GN  orchestrates the chain, stops at gates
 ```
 
 ## Module responsibilities
 
-- **`db/store.py`** — the single source of point-in-time truth. Every
-  read goes through `read_asof(...)` with strict `ts < asof`. No other
-  module writes ad-hoc date filters. Encodes provenance (`hist`/`live`)
-  and `venue`.
-- **`ingest/base.py`** — shared adapter contract: raise on naive
-  datetimes, store fixed-width ISO-8601 UTC, upsert on natural keys,
-  persist cursors atomically. All live vendor calls are mockable.
-- **`ingest/{polymarket,kalshi}.py`** — venue adapters. Kalshi is an
-  order book → reference price is mid/last, never de-vigged.
-- **`ingest/outcomes.py`** — the neutral answer key and coverage source.
-- **`census/`** — G0: classify the market population from text (exclude
-  props), and measure depth at the moments a signal would fire.
-- **`parity/settlement.py`** — G1: prove Kalshi and Polymarket contracts
-  are the same claim per family, with stored per-family tests.
-- **`reference/calibration.py`** — G2: bucket-by-price reliability,
-  Brier/ECE, per venue per regime, vs neutral outcomes.
-- **`reference/lead_lag.py`** — G3: divergence detection + signed
-  convergence direction, per regime.
-- **`analysis/metrics.py`** — seeded event-block bootstrap and the
-  aggregate statistics both gates report.
-- **`analysis/report.py`** — G4: verdict against the frozen rule first,
-  then number, n, CI, caveat flags; every number traces to a stored
-  artifact under `data/artifacts/`.
-- **`engine/run.py`** — orchestration + CLI; stops at each gate.
+- **`core/sport.py`** — the `Sport` interface + `SportParams`. Every gate
+  takes a `sport` and reads `sport.params`; no core module names a sport.
+- **`sports/<sport>/`** — the plugin: `population.py` (classify/prop/tier),
+  `outcomes.py` (neutral source), `params.py` (FROZEN thresholds),
+  `DECISIONS.md` (that sport's ledger), and the `Sport` class in `__init__.py`.
+- **`core/db/store.py`** — the single source of point-in-time truth: every
+  read via `read_asof(...)` with strict `ts < asof`; provenance + venue cols.
+- **`core/ingest/base.py`** — shared adapter contract: raise on naive
+  datetimes, fixed-width ISO-8601 UTC, upsert on natural keys, cursors.
+- **`core/ingest/{polymarket,kalshi}.py`** — venue adapters (mechanics only;
+  the sport is a discovery filter passed in). Kalshi → mid/last, never de-vig.
+- **`core/ingest/record.py`** — the observe-only live recorder (one process
+  per sport; `--sport <s>`).
+- **`core/census/*`** — G0: coverage vs the neutral schedule + depth at
+  signal-moments, with the population predicate injected from `sport`.
+- **`core/parity/settlement.py`** — G1: same-claim per family.
+- **`core/reference/calibration.py` / `lead_lag.py`** — G2/G3 math.
+- **`core/analysis/metrics.py` / `report.py`** — bootstrap; G4 verdict.
+  Every number traces to a stored artifact under `data/<sport>/artifacts/`.
+- **`engine/run.py`** — orchestration + CLI (`--sport`, `--gate`); stops at gates.
 
 ## Invariants the leakage canary pins (`tests/test_leakage.py`)
 

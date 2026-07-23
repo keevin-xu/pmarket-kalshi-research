@@ -63,7 +63,7 @@ vice-versa case). We do not trade in this repo.
 
 ## 5. Method detail
 
-### 5.1 Calibration (`reference/calibration.py`)
+### 5.1 Calibration (`core/reference/calibration.py`)
 - Input: resolved markets, each with `(venue, regime, snapshot_price,
   realized_outcome∈{0,1})`. Outcome from the **neutral** source.
 - Bucket by price; compute realized YES-rate per bucket; compare to the
@@ -72,7 +72,7 @@ vice-versa case). We do not trade in this repo.
 - CIs by **event-block bootstrap** (all contracts of one match in one
   block), seeded.
 
-### 5.2 Lead-lag (`reference/lead_lag.py`)
+### 5.2 Lead-lag (`core/reference/lead_lag.py`)
 - Input: aligned price **time-series** for both venues per market.
 - Detect divergences (gap ≥ threshold, confirmed, not flicker).
 - For each divergence, measure which venue the other converges toward
@@ -81,13 +81,13 @@ vice-versa case). We do not trade in this repo.
 - Also report a symmetric lead-lag cross-correlation / Granger-style
   check as a corroborator. Per regime. Event-block bootstrap, seeded.
 
-### 5.3 Settlement parity (`parity/settlement.py`)
+### 5.3 Settlement parity (`core/parity/settlement.py`)
 - Per market family, an offline mapping test: same map count / series
   length, same void vs resolve rules (forfeits, no-shows, unplayed
   legs), same resolution source & timing. A family passes only with a
   stored test. Non-passing families are excluded from G2–G4.
 
-### 5.4 Depth census (`census/depth.py`)
+### 5.4 Depth census (`core/census/depth.py`)
 - Depth at the **moments a signal would fire**, per venue, per regime.
   Books deepen near events; a random-instant median lies. Volume ≠
   depth. Feeds G0 and the capacity note in the verdict.
