@@ -101,6 +101,25 @@ class ParityConfig:
 
 
 @dataclass(frozen=True)
+class RecorderConfig:
+    # Seconds between poll cycles. A tunable, never a magic number in code.
+    poll_interval_s: int = 20
+    # Only record tier-1 fixtures (the population we trade); log the rest.
+    tier1_only: bool = True
+    # Re-discover the open-fixtures catalog at most this often (memoize between).
+    catalog_ttl_s: int = 300
+    # 429 / vendor-refusal circuit breaker: first refusal arms this cooldown
+    # (no HTTP to that venue), degrade + log loudly; never blind-retry.
+    cooldown_s: int = 3600
+    # Max markets fetched per venue per cycle (loud-capped; drops are counted).
+    max_markets_per_cycle: int = 400
+    # Kalshi orderbook full-book parse is UNVERIFIED (no live LoL book at build
+    # time); raw payload is archived verbatim and parsed defensively until the
+    # first live match pins the schema. Top-of-book (market fields) is verified.
+    kalshi_orderbook_verified: bool = False
+
+
+@dataclass(frozen=True)
 class BootstrapConfig:
     resamples: int = 10_000
     seed: int = 20260709  # seed everything; runs must be bit-identical
@@ -114,6 +133,7 @@ class Config:
     lead_lag: LeadLagConfig = field(default_factory=LeadLagConfig)
     census: CensusConfig = field(default_factory=CensusConfig)
     parity: ParityConfig = field(default_factory=ParityConfig)
+    recorder: RecorderConfig = field(default_factory=RecorderConfig)
     bootstrap: BootstrapConfig = field(default_factory=BootstrapConfig)
 
     # Endpoints from env (no secrets baked in).

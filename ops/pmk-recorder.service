@@ -1,0 +1,25 @@
+[Unit]
+Description=pmarket-kalshi-research live LoL book recorder (observe-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# --- edit these three for your host ---
+User=pmk
+WorkingDirectory=/opt/pmarket-kalshi-research
+ExecStart=/opt/pmarket-kalshi-research/.venv/bin/python -m ingest.record --db /opt/pmarket-kalshi-research/data/db/pmk.db
+# --------------------------------------
+EnvironmentFile=-/opt/pmarket-kalshi-research/.env
+Restart=on-failure
+RestartSec=10
+# journald captures stdout/stderr: `journalctl -u pmk-recorder -f`
+StandardOutput=journal
+StandardError=journal
+# light hardening (it only reads vendors + writes its own DB)
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/pmarket-kalshi-research/data
+
+[Install]
+WantedBy=multi-user.target

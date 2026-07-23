@@ -72,6 +72,43 @@ CREATE TABLE IF NOT EXISTS discards (
                                            -- | 'missing_outcome' | ...
 );
 
+-- Live order-book snapshots from the recorder. FULL book (not just top),
+-- with the raw vendor payload archived verbatim (plan downgrades / parser
+-- bugs must not take the data). One row per (contract, ts). Depth is stored
+-- both as top-of-book and cumulative $/side so a price-impact curve can be
+-- reconstructed. A one-sided/empty book stores NULLs, never zeros.
+CREATE TABLE IF NOT EXISTS book_snapshots (
+    contract_id       TEXT NOT NULL,
+    venue             TEXT NOT NULL,         -- 'polymarket' | 'kalshi'
+    ts                TEXT NOT NULL,         -- TRUE fetch time, fixed-width UTC
+    source            TEXT NOT NULL DEFAULT 'live',
+    regime            TEXT,                  -- 'pre_match' | 'in_game' | NULL
+    fetch_latency_ms  INTEGER,              -- true request round-trip, per row
+    best_bid          REAL,
+    best_ask          REAL,
+    mid               REAL,                  -- (bid+ask)/2, NO de-vig
+    top_bid_usd       REAL,                  -- top-of-book depth this side
+    top_ask_usd       REAL,
+    full_bid_usd      REAL,                  -- cumulative $ across all bid levels
+    full_ask_usd      REAL,
+    n_levels          INTEGER,
+    book_ok           INTEGER,               -- 1 parsed two-sided / 0 gap
+    raw_json          TEXT,                  -- archived verbatim
+    PRIMARY KEY (contract_id, ts, source)
+);
+CREATE INDEX IF NOT EXISTS idx_book_contract_ts ON book_snapshots(contract_id, ts);
+
+-- Per-call vendor spend + remaining-quota log (treat quota as production).
+CREATE TABLE IF NOT EXISTS spend_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    venue           TEXT NOT NULL,
+    ts              TEXT NOT NULL,
+    endpoint        TEXT,
+    status          INTEGER,               -- HTTP status or 0 for transport error
+    remaining_quota TEXT,                  -- vendor header if present
+    note            TEXT
+);
+
 -- Run artifacts index: every reported number traces to a stored artifact.
 CREATE TABLE IF NOT EXISTS run_artifacts (
     run_id          TEXT NOT NULL,

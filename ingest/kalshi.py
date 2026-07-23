@@ -53,9 +53,9 @@ class KalshiAdapter(Adapter):
                     raise VendorError(f"kalshi {url} -> HTTP {resp.status}")
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as e:
-            raise VendorError(f"kalshi {url} -> HTTP {e.code}") from e
+            raise VendorError(f"kalshi {url} -> HTTP {e.code}", status=e.code) from e
         except urllib.error.URLError as e:
-            raise VendorError(f"kalshi {url} -> {e.reason}") from e
+            raise VendorError(f"kalshi {url} -> {e.reason}", status=0) from e
 
     # --- discovery -----------------------------------------------------------
     def list_events(self, series_ticker: str, *, status: str | None = None,
@@ -77,6 +77,12 @@ class KalshiAdapter(Adapter):
             cursor = page.get("cursor") or None
             if not cursor:
                 break
+
+    def get_orderbook(self, market_ticker: str) -> dict:
+        """Raw order book for a market. Schema (`orderbook_fp`) is UNVERIFIED
+        against a live non-empty LoL book at build time — archived verbatim by
+        the recorder; parse defensively until a live match pins it."""
+        return self.fetch(f"markets/{market_ticker}/orderbook")
 
     # --- candlesticks (historical price series) ------------------------------
     def candlesticks(self, series_ticker: str, market_ticker: str,

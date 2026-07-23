@@ -178,6 +178,56 @@ def upsert_contracts(conn: sqlite3.Connection, rows: Iterable[dict]) -> int:
     return len(payload)
 
 
+def upsert_book_snapshots_with_cursor(
+    conn: sqlite3.Connection, rows: Iterable[dict], *,
+    stream: str | None = None, cursor_value: str | None = None,
+) -> int:
+    """Idempotent upsert of book snapshots AND (optionally) the stream cursor,
+    committed in ONE transaction. Restart safety: the cursor advances only if
+    the rows it covers landed. Natural key (contract_id, ts, source) => a
+    re-run over the same input changes nothing."""
+    cols = ("contract_id", "venue", "ts", "source", "regime", "fetch_latency_ms",
+            "best_bid", "best_ask", "mid", "top_bid_usd", "top_ask_usd",
+            "full_bid_usd", "full_ask_usd", "n_levels", "book_ok", "raw_json")
+    payload = [tuple(r.get(c) for c in cols) for r in rows]
+    try:
+        conn.execute("BEGIN")
+        conn.executemany(
+            f"INSERT INTO book_snapshots ({','.join(cols)}) "
+            f"VALUES ({','.join('?' * len(cols))}) "
+            "ON CONFLICT(contract_id, ts, source) DO NOTHING",
+            payload,
+        )
+        if stream is not None and cursor_value is not None:
+            conn.execute(
+                "INSERT INTO cursors (stream, cursor_value, updated_ts) VALUES (?,?,?) "
+                "ON CONFLICT(stream) DO UPDATE SET cursor_value=excluded.cursor_value, "
+                "updated_ts=excluded.updated_ts",
+                [stream, cursor_value, to_ts(datetime.now(timezone.utc))],
+            )
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    return len(payload)
+
+
+def get_cursor(conn: sqlite3.Connection, stream: str) -> str | None:
+    row = conn.execute("SELECT cursor_value FROM cursors WHERE stream = ?",
+                       [stream]).fetchone()
+    return row["cursor_value"] if row else None
+
+
+def log_spend(conn: sqlite3.Connection, venue: str, endpoint: str, status: int,
+              *, remaining_quota: str | None = None, note: str | None = None) -> None:
+    conn.execute(
+        "INSERT INTO spend_log (venue, ts, endpoint, status, remaining_quota, note) "
+        "VALUES (?,?,?,?,?,?)",
+        [venue, to_ts(datetime.now(timezone.utc)), endpoint, status, remaining_quota, note],
+    )
+    conn.commit()
+
+
 def record_discard(
     conn: sqlite3.Connection, stage: str, reason: str, *,
     contract_id: str | None = None, match_id: str | None = None,

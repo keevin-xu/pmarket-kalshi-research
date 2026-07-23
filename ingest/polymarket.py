@@ -56,9 +56,9 @@ class PolymarketAdapter(Adapter):
                     raise VendorError(f"polymarket {url} -> HTTP {resp.status}")
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as e:
-            raise VendorError(f"polymarket {url} -> HTTP {e.code}") from e
+            raise VendorError(f"polymarket {url} -> HTTP {e.code}", status=e.code) from e
         except urllib.error.URLError as e:
-            raise VendorError(f"polymarket {url} -> {e.reason}") from e
+            raise VendorError(f"polymarket {url} -> {e.reason}", status=0) from e
 
     # --- discovery (Gamma, offset-paginated) ---------------------------------
     def iter_events(self, *, closed: bool | None = None, stop_before: str | None = None):

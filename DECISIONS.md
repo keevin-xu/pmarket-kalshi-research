@@ -492,6 +492,52 @@ Overall verdict:
 by these frozen rules; short sample is remedied only by better measurement
 or calendar accrual, never by moving a threshold.
 
+## [2026-07-22] NOTE — Depth refinement: tier-1 only, top-of-book vs full book
+
+The G0 live-depth number ($1–3/side) was measured over ALL open LoL markets
+(mostly minor leagues) — a contaminated proxy. Re-measured on TIER-1 only
+(is_tier1 on the event title; open Polymarket map-winner books, LCK regular
+season live at run time; no playoff/international open to observe):
+- **top-of-book /side: median $7.4, p75 $16, p90 $24, max $306** (n=62).
+- **full book /side (Σ price×size all levels, thinner side): median $241.9,
+  p75 $2,262, p90 $4,283, max $13,438.**
+
+Reading: top-of-book is genuinely thin, but there is meaningful capacity
+DEEPER in the book on tier-1 matches — a few hundred to a few thousand $ if
+you walk levels (paying price impact). This ENRICHES but does NOT overturn
+the frozen G0 depth gate, which is **top-of-book** median ≥ $250 and still
+FAILS ($7.4). It does revise the tradeability read: capacity is modest-but-
+real, not ~$0. Caveat: the DEEPEST matches (playoff/MSI/Worlds) were not
+open at run time, so best-case depth is still unobserved — only the recorder
+running through a finals series can measure it. Implication for the recorder
+spec: capture FULL book + a price-impact curve, not just top-of-book.
+
+## [2026-07-23] NOTE — Live recorder built + dress rehearsal (observe-only)
+
+Built the recorder unit per the Recorder Field Guide (`ingest/record.py`,
+`ops/`): polls both venues' OPEN tier-1 LoL map/series books, writes FULL-book
+snapshots to `book_snapshots` (source='live', raw payload archived, top-of-book
++ cumulative $/side), restart-safe (cycle cursor committed atomically with its
+rows; idempotent upsert), TRUE per-row fetch latency, memoized fixture catalog,
+429/5xx/transport circuit breaker (per-market 404 = gap, NOT a trip), tier-1
+filter, loud drop counts. Observe-only — no order/wallet/execution code.
+
+Dress rehearsal (one live cycle, no keys): catalog 256 Polymarket + 140 Kalshi
+open tier-1 fixtures; 357 snapshots written, 39 per-market gaps (404 tokens)
+dropped-and-counted, zero false circuit-breaks. Latency ~65ms Kalshi / ~174ms
+Polymarket. **Full-book depth on a complete live tier-1 snapshot (Polymarket,
+min side, n=217): p50 $309, p90 $4,281, max $221k** — corroborates the deeper-
+book capacity finding (top-of-book stays thin; the frozen G0 gate is top-of-
+book and still fails).
+
+Caveats pinned: Kalshi `orderbook_fp` full-book schema is UNVERIFIED (no live
+LoL book was open at build time) — top-of-book comes from the verified market
+fields; the raw orderbook is archived verbatim so the first live match pins the
+parser. `RecorderConfig.kalshi_orderbook_verified=False` gates this. To convert
+the CONDITIONAL G4 verdict, run the recorder continuously (weeks) through live
+matches — ideally a playoff/MSI/Worlds series (deepest books, the one depth
+regime unobserved) — then re-judge G2/G3 at the bounded date 2026-09-30.
+
 ## [2026-07-22] RESULT — G4 FINAL VERDICT: CONDITIONAL (reference valid in-game, not yet tradeable)
 
 Artifact `G4_20260722T191945Z.json` (sha256 4b12f2ba15376ab9). Assembled

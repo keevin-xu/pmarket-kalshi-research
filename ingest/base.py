@@ -32,7 +32,19 @@ HTTP_HEADERS = {
 
 
 class VendorError(RuntimeError):
-    """Raised on a non-OK response. Callers must NOT interpret this as empty."""
+    """Raised on a non-OK response. Callers must NOT interpret this as empty.
+
+    `status` carries the HTTP code (0 = transport/SSL/timeout) so callers can
+    tell a REFUSAL (429 / 5xx / transport → circuit-break) from a per-item GAP
+    (e.g. 404 'no book for this token' → skip that item, keep recording)."""
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
+    def is_refusal(self) -> bool:
+        s = self.status
+        return s == 0 or s == 429 or (s is not None and 500 <= s < 600)
 
 
 def require_aware_utc(dt: datetime) -> datetime:
