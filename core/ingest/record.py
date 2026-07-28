@@ -218,6 +218,7 @@ class Recorder:
         cat = self._discover()
         rows: list[dict] = []
         dropped = 0
+        gaps = 0                                   # per-market no-book 404s (normal)
         now = int(time.time())
         archive = self._archive_mode()
 
@@ -236,7 +237,8 @@ class Recorder:
                         self._trip("polymarket", e)
                         break
                     dropped += 1                       # 404 etc. = per-market gap
-                    log.warning("gap: polymarket %s -> %r", f["contract_id"], e)
+                    gaps += 1                          # counted; summarized per cycle
+                    log.debug("gap: polymarket %s -> %r", f["contract_id"], e)
                     continue
                 lat = int((time.monotonic() - t0) * 1000)
                 ts = store.to_ts(datetime.now(timezone.utc))
@@ -253,7 +255,8 @@ class Recorder:
                         self._trip("kalshi", e)
                         break
                     dropped += 1
-                    log.warning("gap: kalshi %s -> %r", f["ticker"], e)
+                    gaps += 1
+                    log.debug("gap: kalshi %s -> %r", f["ticker"], e)
                     continue
                 lat = int((time.monotonic() - t0) * 1000)
                 ts = store.to_ts(datetime.now(timezone.utc))
@@ -263,7 +266,8 @@ class Recorder:
         cursor = store.to_ts(datetime.now(timezone.utc))
         n = store.upsert_book_snapshots_with_cursor(
             self.conn, rows, stream="recorder:cycle", cursor_value=cursor)
-        log.info("cycle: %d snapshots written, %d dropped", n, dropped)
+        log.info("cycle: %d snapshots written, %d dropped (%d no-book gaps, archive=%s)",
+                 n, dropped, gaps, archive)
         return n
 
     def run(self, *, max_cycles: int | None = None) -> None:
