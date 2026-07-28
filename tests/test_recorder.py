@@ -31,6 +31,20 @@ def test_polymarket_full_book_and_worst_first():
     assert s["full_ask_usd"] == 83.0 and s["book_ok"] == 1
 
 
+def test_compact_ladder_preserves_full_levels():
+    import json
+    raw = {"bids": [{"price": "0.40", "size": "100"}, {"price": "0.55", "size": "200"}],
+           "asks": [{"price": "0.60", "size": "80"}]}
+    # compact (default) keeps EVERY level as [price, size] -> price-impact curve intact
+    s = record.parse_polymarket_book(raw, "0x", "in_game", 1, "2026-07-28T00:00:00.000Z")
+    lad = json.loads(s["raw_json"])
+    assert lad["bids"] == [[0.4, 100.0], [0.55, 200.0]] and lad["asks"] == [[0.6, 80.0]]
+    # 'none' drops the ladder but parsed depth columns still record
+    s2 = record.parse_polymarket_book(raw, "0x", "in_game", 1, "2026-07-28T00:00:00.000Z",
+                                      archive="none")
+    assert s2["raw_json"] is None and s2["full_bid_usd"] == 150.0
+
+
 def test_one_sided_book_is_gap_not_zero():
     s = record.parse_polymarket_book({"bids": [{"price": "0.5", "size": "10"}], "asks": []},
                                      "0x", None, 5, "2026-07-23T08:00:00.000Z")

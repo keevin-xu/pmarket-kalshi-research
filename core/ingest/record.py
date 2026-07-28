@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 from core.census import sweep
 from core.config import CONFIG
@@ -38,6 +40,21 @@ def _cumulative_usd(levels: list[tuple[float, float]]) -> float | None:
     return round(sum(p * s for p, s in levels), 2) if levels else None
 
 
+def _ladder_json(archive: str, sides: dict, full_raw: dict | None) -> str | None:
+    """Order-book archive per RecorderConfig.book_archive:
+      'compact' -> the FULL ladder {side: [[price, size], ...]} minus vendor
+                   metadata (preserves the price-impact curve at ~1/2-1/3 bytes),
+      'full'    -> the verbose vendor JSON verbatim,
+      'none'    -> nothing (parsed depth columns still recorded).
+    """
+    if archive == "none":
+        return None
+    if archive == "full":
+        return json.dumps(full_raw or {}, separators=(",", ":"))
+    return json.dumps({k: [[round(p, 6), s] for p, s in v] for k, v in sides.items()},
+                      separators=(",", ":"))
+
+
 def _regime(kickoff_ts: int | None, now: int) -> str | None:
     if kickoff_ts is None:
         return None
@@ -45,7 +62,7 @@ def _regime(kickoff_ts: int | None, now: int) -> str | None:
 
 
 def parse_polymarket_book(raw: dict, contract_id: str, regime: str | None,
-                          latency_ms: int, ts: str) -> dict:
+                          latency_ms: int, ts: str, archive: str = "compact") -> dict:
     """Verified schema: raw['bids'|'asks'] = [{price,size}]. Ladder may arrive
     worst-first -> best via max(bids)/min(asks). Full book cumulative."""
     bids = [(float(l["price"]), float(l["size"])) for l in raw.get("bids", [])]
@@ -60,14 +77,14 @@ def parse_polymarket_book(raw: dict, contract_id: str, regime: str | None,
         "top_ask_usd": round(ask * asz, 2) if two_sided and asz else None,
         "full_bid_usd": _cumulative_usd(bids), "full_ask_usd": _cumulative_usd(asks),
         "n_levels": len(bids) + len(asks), "book_ok": 1 if two_sided else 0,
-        "raw_json": json.dumps(raw, separators=(",", ":")),
+        "raw_json": _ladder_json(archive, {"bids": bids, "asks": asks}, raw),
     }
 
 
 def parse_kalshi_market(market: dict, orderbook_raw: dict | None, regime: str | None,
-                        latency_ms: int, ts: str) -> dict:
+                        latency_ms: int, ts: str, archive: str = "compact") -> dict:
     """Top-of-book from the VERIFIED market fields (yes_bid/ask_dollars, sizes).
-    Full book from orderbook_fp is UNVERIFIED -> archived raw, parsed defensively
+    Full book from orderbook_fp is UNVERIFIED -> archived, parsed defensively
     (None if unrecognized)."""
     bid = market.get("yes_bid_dollars")
     ask = market.get("yes_ask_dollars")
@@ -76,6 +93,8 @@ def parse_kalshi_market(market: dict, orderbook_raw: dict | None, regime: str | 
     bsz = market.get("yes_bid_size_fp")
     asz = market.get("yes_ask_size_fp")
     two_sided = bid is not None and ask is not None
+    yes: list[tuple[float, float]] = []
+    no: list[tuple[float, float]] = []
     full_bid = full_ask = n_levels = None
     if not CONFIG.recorder.kalshi_orderbook_verified:
         ob = (orderbook_raw or {}).get("orderbook_fp") or {}
@@ -87,7 +106,7 @@ def parse_kalshi_market(market: dict, orderbook_raw: dict | None, regime: str | 
                 full_bid, full_ask = _cumulative_usd(yes), _cumulative_usd(no)
                 n_levels = len(yes) + len(no)
         except (TypeError, ValueError):
-            pass
+            yes = no = []
     return {
         "contract_id": market.get("ticker"), "venue": CONFIG.venues.KALSHI, "ts": ts,
         "source": "live", "regime": regime, "fetch_latency_ms": latency_ms,
@@ -96,7 +115,7 @@ def parse_kalshi_market(market: dict, orderbook_raw: dict | None, regime: str | 
         "top_ask_usd": round(ask * float(asz), 2) if two_sided and asz else None,
         "full_bid_usd": full_bid, "full_ask_usd": full_ask, "n_levels": n_levels,
         "book_ok": 1 if two_sided else 0,
-        "raw_json": json.dumps(orderbook_raw or {}, separators=(",", ":")),
+        "raw_json": _ladder_json(archive, {"yes": yes, "no": no}, orderbook_raw),
     }
 
 
@@ -179,12 +198,28 @@ class Recorder:
                  len(cat["polymarket"]), len(cat["kalshi"]))
         return cat
 
+    # --- disk guard ----------------------------------------------------------
+    def _archive_mode(self) -> str:
+        """Configured archive mode, downgraded to 'none' if the DB filesystem
+        is low on space — a full disk must never corrupt the DB."""
+        mode = CONFIG.recorder.book_archive
+        try:
+            free_mb = shutil.disk_usage(Path(self.sport.params.db_path).parent).free / 1e6
+        except OSError:
+            return mode
+        if free_mb < CONFIG.recorder.min_free_disk_mb:
+            log.error("DISK-GUARD: %.0f MB free < %d MB -> archive='none' this cycle "
+                      "(parsed depth still recorded)", free_mb, CONFIG.recorder.min_free_disk_mb)
+            return "none"
+        return mode
+
     # --- one cycle -----------------------------------------------------------
     def poll_cycle(self) -> int:
         cat = self._discover()
         rows: list[dict] = []
         dropped = 0
         now = int(time.time())
+        archive = self._archive_mode()
 
         pm = cat["polymarket"][:CONFIG.recorder.max_markets_per_cycle]
         if len(cat["polymarket"]) > CONFIG.recorder.max_markets_per_cycle:
@@ -206,7 +241,7 @@ class Recorder:
                 lat = int((time.monotonic() - t0) * 1000)
                 ts = store.to_ts(datetime.now(timezone.utc))
                 rows.append(parse_polymarket_book(raw, f["contract_id"],
-                                                  _regime(f["kickoff"], now), lat, ts))
+                                                  _regime(f["kickoff"], now), lat, ts, archive))
 
         if not self._blocked("kalshi"):
             for f in cat["kalshi"][:CONFIG.recorder.max_markets_per_cycle]:
@@ -223,7 +258,7 @@ class Recorder:
                 lat = int((time.monotonic() - t0) * 1000)
                 ts = store.to_ts(datetime.now(timezone.utc))
                 rows.append(parse_kalshi_market(f["market"], ob,
-                                                _regime(f["kickoff"], now), lat, ts))
+                                                _regime(f["kickoff"], now), lat, ts, archive))
 
         cursor = store.to_ts(datetime.now(timezone.utc))
         n = store.upsert_book_snapshots_with_cursor(

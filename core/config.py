@@ -40,13 +40,22 @@ class BootstrapConfig:
 @dataclass(frozen=True)
 class RecorderConfig:
     # Generic recorder MECHANICS (not sport-specific): cadence, breaker, caps.
-    poll_interval_s: int = 20
+    poll_interval_s: int = 60          # 60s: fine for a 5-min convergence window
     tier1_only: bool = True
     catalog_ttl_s: int = 300
     cooldown_s: int = 3600
     max_markets_per_cycle: int = 400
     # Kalshi orderbook full-book parse UNVERIFIED until a live match pins it.
     kalshi_orderbook_verified: bool = False
+    # Order-book archival: "compact" keeps the FULL ladder ([[price,size],...]
+    # per side) minus vendor metadata (~1/2-1/3 the bytes; preserves the
+    # price-impact curve over time); "full" keeps the verbose vendor JSON;
+    # "none" keeps only the parsed columns (mid + top/total depth).
+    book_archive: str = "compact"
+    # Disk guard: if free space on the DB's filesystem drops below this, the
+    # recorder forces archive="none" for the cycle and logs LOUDLY, so a full
+    # disk never corrupts the DB. Parsed columns keep recording safely.
+    min_free_disk_mb: int = 1024
 
 
 @dataclass(frozen=True)
