@@ -3,11 +3,12 @@ sports/<sport>/ and register it here. The engine looks sports up by key
 (`run --sport cs2 ...`); no core module names a sport."""
 from __future__ import annotations
 
+from sports.cs2 import Cs2Sport
 from sports.lol import LolSport
 
 REGISTRY = {
     "lol": LolSport(),
-    # "cs2": Cs2Sport(),   # add when scaffolded
+    "cs2": Cs2Sport(),
 }
 
 
