@@ -42,6 +42,38 @@ def _write_artifact(conn, sport, gate: str, payload: dict) -> str:
     return str(path)
 
 
+def _map_coverage(sport, oe_paths: list[str], cp) -> dict:
+    """Covered MAPS and independent BLOCKS, for sports whose G0 floor is set in
+    those units (`min_covered_maps` / `min_event_blocks`).
+
+    A map is covered iff BOTH venues list that same map (fuzzy team-pair + map
+    number, ±1 day) for a neutral map the sport reports. Both block units are
+    always reported; only the one named by `event_block_unit` is judged, so a
+    reader can see how lumpy the sample is either way.
+    """
+    if not (cp.min_covered_maps or cp.min_event_blocks):
+        return {"applies": False}
+    neutral = sport.load_map_results(oe_paths)
+    kidx = settlement._index_by_day(settlement._dedup(sweep.sweep_kalshi_map_results(sport)))
+    pidx = settlement._index_by_day(settlement._dedup(sweep.sweep_polymarket_map_results(sport)))
+    covered = [m for m in neutral
+               if settlement._find(kidx, m) and settlement._find(pidx, m)]
+    by_match = {str(m.get("match_id", "")).rsplit(":m", 1)[0] for m in covered}
+    by_tournament = {m.get("_league") for m in covered if m.get("_league")}
+    blocks = {"match": len(by_match), "tournament": len(by_tournament)}
+    judged = blocks.get(cp.event_block_unit, blocks["match"])
+    return {
+        "applies": True,
+        "n_neutral_maps": len(neutral),
+        "n_covered_maps": len(covered),
+        "blocks": blocks,
+        "event_block_unit": cp.event_block_unit,
+        "n_blocks_judged": judged,
+        "passes_maps": len(covered) >= cp.min_covered_maps if cp.min_covered_maps else None,
+        "passes_blocks": judged >= cp.min_event_blocks if cp.min_event_blocks else None,
+    }
+
+
 def run_g0(conn, sport, oe_paths: list[str], *, live_depth: bool = True) -> dict:
     """G0 feasibility census, judged vs the sport's FROZEN census params."""
     store.init_schema(conn)
@@ -63,6 +95,7 @@ def run_g0(conn, sport, oe_paths: list[str], *, live_depth: bool = True) -> dict
 
     coverage = cov.coverage_report(
         oe, {CONFIG.venues.KALSHI: k_recs, CONFIG.venues.POLYMARKET: p_recs}, cp)
+    map_cov = _map_coverage(sport, oe_paths, cp)
 
     depth = {}
     if live_depth:
@@ -82,23 +115,35 @@ def run_g0(conn, sport, oe_paths: list[str], *, live_depth: bool = True) -> dict
     for fam in cp.families_phase1:
         both_exist = all(fam in coverage["existence"].get(v, [])
                          for v in (CONFIG.venues.KALSHI, CONFIG.venues.POLYMARKET))
+        n_cov_fam = coverage["per_family_covered"].get(fam, 0)
+        # Sample gate: whichever units this sport froze. Where a map/block
+        # floor is in force it BINDS and the match count is a diagnostic.
+        if map_cov.get("applies"):
+            sample_ok = all(v for v in (map_cov["passes_maps"], map_cov["passes_blocks"])
+                            if v is not None)
+        else:
+            sample_ok = n_cov_fam >= cp.min_covered_matches
         per_family_verdict[fam] = {
             "both_venues_exist": both_exist,
-            "n_covered": coverage["per_family_covered"].get(fam, 0),
-            "go_to_G1": bool(both_exist and coverage["per_family_covered"].get(fam, 0)
-                             >= cp.min_covered_matches),
+            "n_covered": n_cov_fam,
+            "sample_gate_passed": bool(sample_ok),
+            "go_to_G1": bool(both_exist and sample_ok),
         }
 
     payload = {
         "gate": "G0", "sport": sport.key,
         "frozen_rules": {
             "min_covered_matches": cp.min_covered_matches,
+            "min_covered_maps": cp.min_covered_maps,
+            "min_event_blocks": cp.min_event_blocks,
+            "event_block_unit": cp.event_block_unit,
             "min_depth_usd_per_side": min_depth,
             "window_start": cp.window_start,
             "tier1_leagues": list(cp.tier1_leagues),
             "families_phase1": list(cp.families_phase1),
         },
         "coverage": coverage,
+        "map_coverage": map_cov,
         "polymarket_sweep": {
             "n_records": len(p_recs), "oldest_ts": pm_oldest,
             "pagination_capped": bool(getattr(pm, "pagination_capped", False)),
@@ -286,6 +331,15 @@ def _print_g0(p: dict) -> None:
     print(f"covered by BOTH venues:  {c['n_covered']}  (gate >= {c['gate_min_covered']}) -> "
           f"{'PASS' if c['passes_coverage'] else 'FAIL'}")
     print(f"coverage % (diagnostic): {c['coverage_pct']*100:.1f}%")
+    m = p.get("map_coverage") or {}
+    if m.get("applies"):
+        fr = p["frozen_rules"]
+        print(f"covered MAPS:            {m['n_covered_maps']} of {m['n_neutral_maps']} "
+              f"neutral (gate >= {fr['min_covered_maps']}) -> "
+              f"{'PASS' if m['passes_maps'] else 'FAIL'}")
+        print(f"independent blocks:      {m['n_blocks_judged']} "
+              f"({m['event_block_unit']}; gate >= {fr['min_event_blocks']}) -> "
+              f"{'PASS' if m['passes_blocks'] else 'FAIL'}   all units: {m['blocks']}")
     print(f"existence: {c['existence']}")
     print("per-family:")
     for fam, v in p["per_family_verdict"].items():

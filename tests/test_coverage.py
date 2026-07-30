@@ -62,3 +62,45 @@ def test_series_collapse_counts_once():
     rep = cov.coverage_report(oe, {"kalshi": v, "polymarket": v}, CP)
     assert rep["n_tier1_series"] == 1
     assert rep["n_covered"] == 1
+
+
+# --- G0 sample floor in maps/blocks (sports that set it) ----------------------
+def test_map_and_block_floors_are_reported_and_judged():
+    from core.sport import CensusParams
+    from engine import run as engine_run
+
+    cp = CensusParams(min_covered_maps=2, min_event_blocks=2,
+                      event_block_unit="tournament")
+
+    class _Sport:
+        params = None
+
+        def load_map_results(self, paths):
+            return [
+                {"teams": ("A", "B"), "ts": "2026-07-01T00:00:00.000Z", "map_no": 1,
+                 "winner": "A", "match_id": "m1:m1", "_league": "IEM"},
+                {"teams": ("A", "B"), "ts": "2026-07-01T00:00:00.000Z", "map_no": 2,
+                 "winner": "B", "match_id": "m1:m2", "_league": "IEM"},
+                {"teams": ("C", "D"), "ts": "2026-07-02T00:00:00.000Z", "map_no": 1,
+                 "winner": "C", "match_id": "m2:m1", "_league": "BLAST"},
+            ]
+
+    venue_maps = [
+        {"teams": ("A", "B"), "ts": "2026-07-01T00:00:00.000Z", "map_no": 1, "winner": "A"},
+        {"teams": ("A", "B"), "ts": "2026-07-01T00:00:00.000Z", "map_no": 2, "winner": "B"},
+        {"teams": ("C", "D"), "ts": "2026-07-02T00:00:00.000Z", "map_no": 1, "winner": "C"},
+    ]
+    engine_run.sweep.sweep_kalshi_map_results = lambda s: list(venue_maps)
+    engine_run.sweep.sweep_polymarket_map_results = lambda s: list(venue_maps[:2])
+
+    out = engine_run._map_coverage(_Sport(), [], cp)
+    assert out["n_covered_maps"] == 2                 # map 3 has one venue only
+    assert out["blocks"] == {"match": 1, "tournament": 1}
+    assert out["passes_maps"] is True                 # 2 >= 2
+    assert out["passes_blocks"] is False              # 1 tournament < 2
+
+
+def test_map_floor_is_inert_for_sports_that_did_not_set_it():
+    from core.sport import CensusParams
+    from engine import run as engine_run
+    assert engine_run._map_coverage(None, [], CensusParams()) == {"applies": False}

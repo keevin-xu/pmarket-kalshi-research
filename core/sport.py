@@ -39,6 +39,17 @@ class LeadLagParams:
 class CensusParams:
     min_depth_usd_per_side: float = 250.0
     min_covered_matches: int = 60
+    # A sport may instead (or additionally) set its G0 sample floor in the
+    # units the study actually uses: the MAP is the traded claim and the
+    # calibration point, and the number of independent BLOCKS is what bounds
+    # the lead-lag confidence interval. A match count proxies both, badly.
+    # 0 = criterion not in force for this sport (LoL's floor is matches).
+    min_covered_maps: int = 0
+    min_event_blocks: int = 0
+    # What counts as one independent block: "match" (the bootstrap's own unit)
+    # or "tournament" (a map record's `_league`). Sports whose covered maps
+    # cluster into a handful of events want the stricter one.
+    event_block_unit: str = "match"
     tier1_coverage_floor: float = 0.80
     families_phase1: tuple[str, ...] = ()
     coverage_join_tolerance_min: int = 90

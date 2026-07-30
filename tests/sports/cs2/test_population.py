@@ -67,3 +67,18 @@ def test_looks_tier1_is_a_title_hint_only():
     assert pop.looks_tier1("Counter-Strike: A vs B (BO3) - IEM Cologne Major")
     assert not pop.looks_tier1("Counter-Strike: A vs B (BO3) - CCT Europe Contenders #7")
     assert not pop.looks_tier1("Counter-Strike: A vs B (BO3) - BLAST Bounty Closed Qualifier")
+
+
+def test_sweep_asks_the_sport_for_the_map_number():
+    """core's own regex is LoL's ("Game N"). Without the sport hook every CS2
+    map market is silently dropped from the sweep."""
+    from core.census import sweep
+    from sports.cs2 import Cs2Sport
+    from sports.lol import LolSport
+    q_cs2 = "Counter-Strike: A vs B - Map 2 Winner"
+    q_lol = "LoL: T1 vs GEN - Game 3 Winner"
+    assert sweep._map_number(Cs2Sport(), q_cs2) == 2
+    assert sweep._map_number(Cs2Sport(), q_lol) is None
+    # LoL has no hook -> unchanged fallback to the original pattern
+    assert sweep._map_number(LolSport(), q_lol) == 3
+    assert sweep._map_number(LolSport(), q_cs2) is None

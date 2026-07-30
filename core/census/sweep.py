@@ -25,6 +25,21 @@ _SLUG_DATE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 _GAME_NO = re.compile(r"\bgame (\d+)\b", re.IGNORECASE)
 
 
+def _map_number(sport, question: str) -> int | None:
+    """Map number from a venue question, asking the SPORT first.
+
+    Venues phrase this per sport — LoL markets say "Game 2 Winner", CS2 says
+    "Map 2 Winner" — so a single regex here silently drops every map of any
+    sport it wasn't written for. A sport that implements `map_number` decides;
+    the fallback is the original LoL pattern, unchanged.
+    """
+    fn = getattr(sport, "map_number", None)
+    if fn is not None:
+        return fn(question)
+    m = _GAME_NO.search(question or "")
+    return int(m.group(1)) if m else None
+
+
 def _iso_to_dt(s: str) -> datetime | None:
     if not s:
         return None
@@ -222,10 +237,10 @@ def sweep_polymarket_map_results(sport, adapter: PolymarketAdapter | None = None
             text = f'{ev.get("title","")} — {m.get("question","")}'
             if sport.is_prop(text) or sport.classify_family(text) != "map_winner":
                 continue
-            g = _GAME_NO.search(m.get("question", ""))
-            if not g:
+            map_no = _map_number(sport, m.get("question", ""))
+            if map_no is None:
                 continue
-            out.append({"teams": pair, "ts": store.to_ts(t), "map_no": int(g.group(1)),
+            out.append({"teams": pair, "ts": store.to_ts(t), "map_no": map_no,
                         "winner": _pm_winner(m), "contract_id": m.get("conditionId"),
                         "outcomes": _json_list(m.get("outcomes")),
                         "tokens": _json_list(m.get("clobTokenIds"))})

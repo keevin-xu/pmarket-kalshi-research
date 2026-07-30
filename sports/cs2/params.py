@@ -21,15 +21,6 @@ from core.sport import (CensusParams, LeadLagParams, ParityParams,
 
 _DATA = ROOT / "data" / "cs2"
 
-# --- CS2-specific tunables that the shared param shapes cannot yet hold -----
-# RULING 2026-07-30: the G0 sample floor is counted in the study's own unit —
-# maps and independent event blocks — not matches. `min_covered_matches`
-# below stays as a reported diagnostic. Wiring these into the G0 verdict
-# needs two additive fields on CensusParams; that lands with the G0 build,
-# and these are the values it must use.
-G0_MIN_COVERED_MAPS = 100
-G0_MIN_EVENT_BLOCKS = 8
-
 # The secondary, always-reported population (DECISION 2026-07-30). Reported
 # beside tier-s in every gate artifact; never substituted for it.
 TIER_SECONDARY_ARM = ("a",)
@@ -52,6 +43,14 @@ CS2_PARAMS = SportParams(
     census=CensusParams(
         min_depth_usd_per_side=250.0,          # proposal (G0)
         min_covered_matches=60,                # diagnostic; the gate is maps+blocks
+        # RULING 2026-07-30, amended: the G0 sample floor is counted in the
+        # study's own units. A block is a TOURNAMENT, the only unit that
+        # addresses the real risk (a result resting on one Major); 6 rather
+        # than 8 because the tier-s calendar runs ~4-6 events a quarter, and 8
+        # would push the verdict past the bounded date.
+        min_covered_maps=100,
+        min_event_blocks=6,
+        event_block_unit="tournament",
         tier1_coverage_floor=0.80,             # diagnostic only
         families_phase1=("map_winner",),       # match_winner is phase 2
         coverage_join_tolerance_min=90,
