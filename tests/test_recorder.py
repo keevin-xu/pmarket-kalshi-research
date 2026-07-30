@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import pytest
 
+from dataclasses import replace
+
+from core.config import CONFIG
 from core.db import store
 from core.ingest.base import VendorError
 from core.ingest import record
@@ -134,3 +137,66 @@ def test_404_is_a_gap_not_a_trip(conn):
     rec = record.Recorder(conn, SPORT, _FakeKalshi(), _FakePoly(raise_book=True, book_status=404))
     rec.poll_cycle()
     assert not rec._blocked("polymarket")
+
+
+# --- cap rotation + no-book resting -------------------------------------------
+def _tune(monkeypatch, **kw):
+    """RecorderConfig is frozen (as it should be); swap in a tuned copy."""
+    monkeypatch.setattr(record, "CONFIG",
+                        replace(CONFIG, recorder=replace(CONFIG.recorder, **kw)))
+class _ManyPoly(_FakePoly):
+    """A catalog larger than the cap, where most markets have no book — the
+    real CS2 shape (728 fixtures, ~75% returning 404)."""
+
+    def __init__(self, n=7, with_book=(0, 1)):
+        super().__init__()
+        self.n = n
+        self.with_book = set(with_book)
+        self.polled: list[str] = []
+
+    def iter_events(self, tag, *, closed=None, stop_before=None):
+        return [{"title": f"LoL: A{i} vs B{i} (BO3) - LCK", "slug": f"lol-a-b-2026-07-2{i%10}",
+                 "markets": [{"question": "LoL: A vs B - Game 1 Winner",
+                              "conditionId": f"0x{i}", "clobTokenIds": [f"tok{i}", "t2"]}]}
+                for i in range(self.n)]
+
+    def book(self, token):
+        self.polled.append(token)
+        idx = int(token.replace("tok", ""))
+        if idx not in self.with_book:
+            raise VendorError("no book", status=404)
+        return {"bids": [{"price": "0.5", "size": "10"}], "asks": [{"price": "0.6", "size": "10"}]}
+
+
+def test_cap_rotates_so_the_tail_is_never_permanently_blind(conn, monkeypatch):
+    """A fixed head-slice would poll markets 0-2 forever and never see 3-6.
+    Every market must be visited within ceil(len/cap) cycles."""
+    _tune(monkeypatch, max_markets_per_cycle=3)
+    poly = _ManyPoly(n=7, with_book=range(7))
+    rec = record.Recorder(conn, SPORT, _FakeKalshi(), poly)
+    for _ in range(3):                       # ceil(7/3) = 3 cycles
+        rec._catalog = None                  # force re-discovery each cycle
+        rec.poll_cycle()
+    assert {t for t in poly.polled} == {f"tok{i}" for i in range(7)}
+
+
+def test_a_market_with_no_book_rests_instead_of_burning_the_budget(conn):
+    poly = _ManyPoly(n=4, with_book=(0,))
+    rec = record.Recorder(conn, SPORT, _FakeKalshi(), poly)
+    rec.poll_cycle()
+    first = len(poly.polled)
+    poly.polled.clear()
+    rec._catalog = None
+    rec.poll_cycle()
+    # only the one market that HAS a book is polled again; the 404s are resting
+    assert first == 4 and poly.polled == ["tok0"]
+
+
+def test_resting_expires_so_a_market_that_gains_a_book_is_picked_up(conn, monkeypatch):
+    _tune(monkeypatch, nobook_cooldown_cycles=2)
+    poly = _ManyPoly(n=2, with_book=(0,))
+    rec = record.Recorder(conn, SPORT, _FakeKalshi(), poly)
+    for _ in range(4):
+        rec._catalog = None
+        rec.poll_cycle()
+    assert poly.polled.count("tok1") >= 2     # retried after the cooldown, not dropped forever

@@ -131,6 +131,8 @@ class Recorder:
         self._cooldown: dict[str, float] = {}   # venue -> unix cooldown_until
         self._catalog: dict | None = None
         self._catalog_at = 0.0
+        self._cycle = 0                         # drives cap rotation
+        self._nobook: dict[str, int] = {}       # market -> cycle it may be polled again
 
     # --- circuit breaker -----------------------------------------------------
     def _blocked(self, venue: str) -> bool:
@@ -213,6 +215,33 @@ class Recorder:
             return "none"
         return mode
 
+    # --- selection: rotate under the cap, rest markets with no book ----------
+    def _eligible(self, fixtures: list[dict], key) -> list[dict]:
+        """Drop markets currently resting after a no-book response."""
+        return [f for f in fixtures if self._nobook.get(key(f), -1) <= self._cycle]
+
+    def _select(self, fixtures: list[dict], venue: str) -> list[dict]:
+        """At most `max_markets_per_cycle`, ROTATING across cycles.
+
+        Slicing the head every cycle would poll the same first N markets
+        forever and never once look at the tail — with a catalog well over the
+        cap, that is a permanent, silent blind spot. Rotating guarantees every
+        market is visited within ceil(len/cap) cycles.
+        """
+        cap = CONFIG.recorder.max_markets_per_cycle
+        if len(fixtures) <= cap:
+            return fixtures
+        start = (self._cycle * cap) % len(fixtures)
+        picked = (fixtures + fixtures)[start:start + cap]
+        log.warning("CAP: %s catalog %d > cap %d — polling %d this cycle "
+                    "(rotating, full sweep every %d cycles)",
+                    venue, len(fixtures), cap, len(picked),
+                    -(-len(fixtures) // cap))
+        return picked
+
+    def _rest(self, key: str) -> None:
+        self._nobook[key] = self._cycle + CONFIG.recorder.nobook_cooldown_cycles
+
     # --- one cycle -----------------------------------------------------------
     def poll_cycle(self) -> int:
         cat = self._discover()
@@ -222,11 +251,10 @@ class Recorder:
         now = int(time.time())
         archive = self._archive_mode()
 
-        pm = cat["polymarket"][:CONFIG.recorder.max_markets_per_cycle]
-        if len(cat["polymarket"]) > CONFIG.recorder.max_markets_per_cycle:
-            dropped += len(cat["polymarket"]) - len(pm)
-            log.warning("CAP: dropped %d Polymarket markets this cycle",
-                        len(cat["polymarket"]) - len(pm))
+        pm_all = self._eligible(cat["polymarket"], lambda f: f["contract_id"])
+        resting = len(cat["polymarket"]) - len(pm_all)
+        pm = self._select(pm_all, "polymarket")
+        dropped += len(pm_all) - len(pm)
         if not self._blocked("polymarket"):
             for f in pm:
                 t0 = time.monotonic()
@@ -238,6 +266,7 @@ class Recorder:
                         break
                     dropped += 1                       # 404 etc. = per-market gap
                     gaps += 1                          # counted; summarized per cycle
+                    self._rest(f["contract_id"])       # no book: stop burning budget on it
                     log.debug("gap: polymarket %s -> %r", f["contract_id"], e)
                     continue
                 lat = int((time.monotonic() - t0) * 1000)
@@ -245,8 +274,12 @@ class Recorder:
                 rows.append(parse_polymarket_book(raw, f["contract_id"],
                                                   _regime(f["kickoff"], now), lat, ts, archive))
 
+        k_all = self._eligible(cat["kalshi"], lambda f: f["ticker"])
+        resting += len(cat["kalshi"]) - len(k_all)
+        k = self._select(k_all, "kalshi")
+        dropped += len(k_all) - len(k)
         if not self._blocked("kalshi"):
-            for f in cat["kalshi"][:CONFIG.recorder.max_markets_per_cycle]:
+            for f in k:
                 t0 = time.monotonic()
                 try:
                     ob = self.kalshi.get_orderbook(f["ticker"])
@@ -256,6 +289,7 @@ class Recorder:
                         break
                     dropped += 1
                     gaps += 1
+                    self._rest(f["ticker"])
                     log.debug("gap: kalshi %s -> %r", f["ticker"], e)
                     continue
                 lat = int((time.monotonic() - t0) * 1000)
@@ -263,11 +297,12 @@ class Recorder:
                 rows.append(parse_kalshi_market(f["market"], ob,
                                                 _regime(f["kickoff"], now), lat, ts, archive))
 
+        self._cycle += 1
         cursor = store.to_ts(datetime.now(timezone.utc))
         n = store.upsert_book_snapshots_with_cursor(
             self.conn, rows, stream="recorder:cycle", cursor_value=cursor)
-        log.info("cycle: %d snapshots written, %d dropped (%d no-book gaps, archive=%s)",
-                 n, dropped, gaps, archive)
+        log.info("cycle: %d snapshots written, %d dropped (%d no-book gaps, "
+                 "%d resting, archive=%s)", n, dropped, gaps, resting, archive)
         return n
 
     def run(self, *, max_cycles: int | None = None) -> None:

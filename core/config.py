@@ -45,6 +45,15 @@ class RecorderConfig:
     catalog_ttl_s: int = 300
     cooldown_s: int = 3600
     max_markets_per_cycle: int = 400
+    # When the catalog exceeds the cap the selection ROTATES between cycles.
+    # A fixed head-slice would poll the same first N markets forever and never
+    # once look at the tail — a permanent blind spot that looks like a healthy
+    # recorder in the logs.
+    # A market whose book 404s is skipped for this many cycles. Illiquid
+    # "open" markets have no book at all and otherwise burn most of the request
+    # budget, which is what forces the cap to bind in the first place. Kept
+    # short so a market that gains a book near kickoff is picked up quickly.
+    nobook_cooldown_cycles: int = 5
     # Kalshi orderbook full-book parse UNVERIFIED until a live match pins it.
     kalshi_orderbook_verified: bool = False
     # Order-book archival: "compact" keeps the FULL ladder ([[price,size],...]
