@@ -192,6 +192,32 @@ class OutcomesAdapter(Adapter):
         path.write_text(json.dumps(snapshot, indent=1))
         return str(path)
 
+    def fixtures_since(self, since_iso: str) -> list[dict]:
+        """Live/upcoming/just-finished fixtures with their NEUTRAL tier.
+
+        Needed because depth is measured on OPEN markets, which by definition
+        are not in the settled archive. Tier still comes from the neutral row —
+        never from a venue title — so the depth measurement covers the same
+        population the gate names.
+        """
+        f = {"filter[matches.start_date][gt]": since_iso}
+        self._assert_filter_bound("matches", f)
+        matches = self._paged("matches", f, sort="start_date")
+        team_ids = sorted({t for m in matches
+                           for t in (m.get("team1_id"), m.get("team2_id")) if t})
+        teams = {str(t["id"]): t for t in self._batched("teams", "filter[teams.id][in]", team_ids)
+                 if t.get("id") is not None}
+        out = []
+        for m in matches:
+            a, b = self._team_name(teams, m.get("team1_id")), self._team_name(teams, m.get("team2_id"))
+            start = _iso(m.get("start_date"))
+            if not (a and b and start):
+                continue
+            out.append({"teams": (a, b), "ts": store.to_ts(start),
+                        "tier": (m.get("tier") or "").strip().lower() or None,
+                        "status": m.get("status")})
+        return out
+
     def _batched(self, resource: str, filter_key: str, ids: list, size: int = 40) -> list[dict]:
         """Fetch rows by id in batches, paginating WITHIN each batch.
 

@@ -21,29 +21,40 @@ def _quantile(xs: list[float], q: float) -> float | None:
     return s[i]
 
 
-def depth_at_signal_moments(conn, venue: str, regime: str) -> dict:
+def depth_at_signal_moments(conn, venue: str, regime: str,
+                            since: str | None = None) -> dict:
     """Distribution of top-of-book depth per side for a (venue, regime) over
     LIVE quotes. The per-market signal-moment depth = min(bid_side, ask_side)
     USD (both sides must be tradeable). Returns median/quantiles + n, flagged
     live; a market with a one-sided book is a below-depth discard, not a zero.
+
+    `since` scopes the read to one observation window — normally the run that
+    is reporting the number. Without it the median mixes every live row the
+    database has ever held, so a change in WHICH markets are observed cannot
+    be seen in the result, and an older run's population silently survives
+    into a newer run's number.
     """
-    rows = conn.execute(
-        "SELECT contract_id, bid_size_usd, ask_size_usd FROM quotes "
-        "WHERE venue = ? AND source = 'live' AND regime = ? "
-        "AND bid_size_usd IS NOT NULL AND ask_size_usd IS NOT NULL",
-        [venue, regime],
-    ).fetchall()
+    sql = ("SELECT contract_id, bid_size_usd, ask_size_usd FROM quotes "
+           "WHERE venue = ? AND source = 'live' AND regime = ? "
+           "AND bid_size_usd IS NOT NULL AND ask_size_usd IS NOT NULL")
+    params: list = [venue, regime]
+    if since is not None:
+        sql += " AND ts >= ?"
+        params.append(since)
+    rows = conn.execute(sql, params).fetchall()
 
     per_market = [min(r["bid_size_usd"], r["ask_size_usd"]) for r in rows]
     n = len(per_market)
     if n == 0:
         return {"venue": venue, "regime": regime, "n": 0, "source": "live",
-                "median_usd": None, "note": "no live two-sided book observed"}
+                "since": since, "median_usd": None,
+                "note": "no live two-sided book observed in this window"}
     return {
         "venue": venue,
         "regime": regime,
         "source": "live",
         "n": n,
+        "since": since,
         "median_usd": statistics.median(per_market),
         "p25_usd": _quantile(per_market, 0.25),
         "p75_usd": _quantile(per_market, 0.75),

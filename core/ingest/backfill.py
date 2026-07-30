@@ -38,57 +38,13 @@ from core.census import coverage as cov
 from core.census import sweep
 from core.config import CONFIG
 from core.db import store
-from core.ingest.base import VendorError
+from core.ingest.base import Pacer, Refused, VendorError, with_retries
 from core.ingest.kalshi import KalshiAdapter
 from core.ingest.polymarket import PolymarketAdapter
 
 log = logging.getLogger("backfill")
 
 STAGES = ("neutral", "kalshi", "polymarket")
-
-
-class Refused(VendorError):
-    """The vendor refused repeatedly (429/5xx/transport). Distinct from a
-    plain VendorError so a per-item handler cannot mistake a sustained outage
-    for "this market simply has no history" — that swallow would write the
-    outage into the archive as a fact about the market."""
-
-
-class Pacer:
-    """Self-imposed request spacing. Neither venue publishes a rate-limit or
-    Retry-After header, so the only safe pacing is our own."""
-
-    def __init__(self, interval_s: float):
-        self.interval_s = interval_s
-        self._last = 0.0
-
-    def wait(self) -> None:
-        gap = self.interval_s - (time.monotonic() - self._last)
-        if gap > 0:
-            time.sleep(gap)
-        self._last = time.monotonic()
-
-
-def _with_retries(fn, *, pacer: Pacer, venue: str, what: str, conn=None):
-    """Run a vendor call, backing off on refusals and FAILING LOUDLY if they
-    persist. A refusal is an outage; returning empty here would write a gap
-    into the archive as though the vendor had said "nothing happened"."""
-    cfg = CONFIG.backfill
-    for attempt in range(cfg.max_refusal_retries):
-        pacer.wait()
-        try:
-            return fn()
-        except VendorError as e:
-            if conn is not None:
-                store.log_spend(conn, venue, what, e.status or 0, note=repr(e))
-            if not e.is_refusal():
-                raise                                   # 404 etc. = a per-item gap
-            backoff = cfg.refusal_backoff_s * (attempt + 1)
-            log.warning("REFUSAL %s %s (%r) — backing off %.0fs (%d/%d)",
-                        venue, what, e, backoff, attempt + 1, cfg.max_refusal_retries)
-            time.sleep(backoff)
-    raise Refused(f"{venue} {what}: refused {cfg.max_refusal_retries} times; "
-                  f"stopping rather than recording an outage as empty history")
 
 
 class Backfill:
@@ -167,10 +123,13 @@ class Backfill:
         for series, family in self.sport.kalshi_series().items():
             cursor = None
             while True:
-                page = _with_retries(
-                    lambda s=series, c=cursor: self.kalshi.list_events(s, status="settled", cursor=c),
+                page = with_retries(
+                    lambda s=series, c=cursor: self.kalshi.list_events(
+                        s, status="settled", cursor=c),
                     pacer=self.k_pace, venue=CONFIG.venues.KALSHI,
-                    what=f"events/{series}", conn=self.conn)
+                    what=f"events/{series}",
+                    max_tries=CONFIG.backfill.max_refusal_retries,
+                    backoff_s=CONFIG.backfill.refusal_backoff_s)
                 events = page.get("events") or []
                 if not events:
                     break
@@ -223,14 +182,16 @@ class Backfill:
             open_ts = _unix(t["market"].get("open_time")) or (_unix(t["market"].get("close_time")) or 0)
             close_ts = _unix(t["market"].get("close_time")) or open_ts
             try:
-                candles = _with_retries(
+                candles = with_retries(
                     lambda: self.kalshi.candlesticks(
                         t["series"], ticker,
                         open_ts - CONFIG.backfill.preroll_s,
                         close_ts + CONFIG.backfill.postroll_s,
                         CONFIG.backfill.candle_period_min),
                     pacer=self.k_pace, venue=CONFIG.venues.KALSHI,
-                    what=f"candles/{ticker}", conn=self.conn)
+                    what=f"candles/{ticker}",
+                    max_tries=CONFIG.backfill.max_refusal_retries,
+                    backoff_s=CONFIG.backfill.refusal_backoff_s)
             except Refused:
                 raise                                # sustained outage: stop the stage
             except VendorError as e:
@@ -303,10 +264,12 @@ class Backfill:
                 skipped += 1
                 continue
             try:
-                hist = _with_retries(
+                hist = with_retries(
                     lambda: self.poly.prices_history(t["token"]),
                     pacer=self.p_pace, venue=CONFIG.venues.POLYMARKET,
-                    what=f"history/{t['contract_id']}", conn=self.conn)
+                    what=f"history/{t['contract_id']}",
+                    max_tries=CONFIG.backfill.max_refusal_retries,
+                    backoff_s=CONFIG.backfill.refusal_backoff_s)
             except Refused:
                 raise                                # sustained outage: stop the stage
             except VendorError as e:

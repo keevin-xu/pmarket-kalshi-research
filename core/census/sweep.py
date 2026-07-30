@@ -15,8 +15,22 @@ from datetime import datetime, timezone
 
 from core.config import CONFIG
 from core.db import store
+from core.ingest.base import Pacer, with_retries
 from core.ingest.kalshi import KalshiAdapter
 from core.ingest.polymarket import PolymarketAdapter
+
+# Census sweeps are BULK reads: thousands of pages in a tight loop. Unpaced,
+# they trip the venue's rate limit and the gate dies half-swept — which is a
+# vendor outage, not a market finding. Same discipline as the backfill.
+_K_PACE = Pacer(CONFIG.backfill.kalshi_min_interval_s)
+
+
+def _kalshi_page(adapter, series, *, status, cursor):
+    return with_retries(
+        lambda: adapter.list_events(series, status=status, cursor=cursor),
+        pacer=_K_PACE, venue=CONFIG.venues.KALSHI, what=f"events/{series}",
+        max_tries=CONFIG.backfill.max_refusal_retries,
+        backoff_s=CONFIG.backfill.refusal_backoff_s)
 
 # Generic "<Sport>: TeamA vs TeamB (…) - League" title -> (TeamA, TeamB).
 _TITLE = re.compile(r"^[^:]+:\s*(.+?)\s+vs\.?\s+(.+)", re.IGNORECASE)
@@ -118,7 +132,7 @@ def sweep_kalshi(sport, adapter: KalshiAdapter | None = None):
     for series, family in sport.kalshi_series().items():
         cursor, stop = None, False
         while not stop:
-            page = adapter.list_events(series, status="settled", cursor=cursor)
+            page = _kalshi_page(adapter, series, status="settled", cursor=cursor)
             events = page.get("events", [])
             if not events:
                 break
@@ -191,7 +205,7 @@ def sweep_kalshi_map_results(sport, adapter: KalshiAdapter | None = None) -> lis
     for series in map_series:
         cursor = None
         while True:
-            page = adapter.list_events(series, status="settled", cursor=cursor)
+            page = _kalshi_page(adapter, series, status="settled", cursor=cursor)
             events = page.get("events", [])
             if not events:
                 break
@@ -249,8 +263,17 @@ def sweep_polymarket_map_results(sport, adapter: PolymarketAdapter | None = None
 
 # --- Polymarket (OPEN markets -> live book snapshots for depth) --------------
 def sweep_polymarket_live_depth(sport, conn, adapter: PolymarketAdapter | None = None) -> int:
+    """Live top-of-book depth over the sport's FROZEN population.
+
+    Tier is resolved per fixture from the NEUTRAL source where the sport can
+    supply it (`neutral_tier`); a fixture whose tier cannot be established is a
+    stored discard, not an inclusion. Measuring depth over every open market a
+    venue happens to list produces a median describing the venue's long tail
+    rather than the population the gate names.
+    """
     adapter = adapter or PolymarketAdapter()
     families = sport.params.census.families_phase1
+    tier_of = getattr(sport, "neutral_tier", None)
     now = datetime.now(timezone.utc)
     n = 0
     for ev in adapter.iter_events(sport.polymarket_tag(), closed=False):
@@ -258,6 +281,18 @@ def sweep_polymarket_live_depth(sport, conn, adapter: PolymarketAdapter | None =
         if pair is None:
             continue
         start = pm_match_dt(ev)
+        if tier_of is not None:
+            tier = tier_of(pair, start or now)
+            if tier is None:
+                store.record_discard(conn, "census", "tier_unknown",
+                                     contract_id=ev.get("slug"))
+                continue
+            if not sport.is_tier1(ev.get("title", ""), tier):
+                store.record_discard(conn, "census", "not_tier1",
+                                     contract_id=ev.get("slug"))
+                continue
+        elif not sport.is_tier1(ev.get("title", "")):
+            continue
         regime = CONFIG.regimes.PRE_MATCH if (start is None or start > now) \
             else CONFIG.regimes.IN_GAME
         for m in ev.get("markets", []) or []:

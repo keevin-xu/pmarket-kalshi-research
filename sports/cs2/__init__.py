@@ -11,6 +11,8 @@ so no gate can pool them.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from core.db import store
 from core.sport import SportParams
 from sports.cs2 import params as P
@@ -113,6 +115,30 @@ class Cs2Sport:
                 continue
             out.append(r)
         return out
+
+    # --- neutral tier for an OPEN fixture (depth measurement) ----------------
+    _schedule: list[dict] | None = None
+
+    def neutral_tier(self, teams: tuple[str, str], when) -> str | None:
+        """Tier of a currently-open fixture, from the neutral source.
+
+        Depth is measured on open books, which are not in the settled archive,
+        so the schedule is fetched live and cached for the process. Returns
+        None when the fixture cannot be identified — the caller must treat that
+        as a DISCARD, never as "include it": measuring depth over unidentified
+        fixtures is what put tier-3 books into a tier-1 number.
+        """
+        from core.census import coverage as cov
+        if Cs2Sport._schedule is None:
+            since = (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            Cs2Sport._schedule = OutcomesAdapter().fixtures_since(since)
+        day = when.strftime("%Y-%m-%d") if hasattr(when, "strftime") else str(when)[:10]
+        for f in Cs2Sport._schedule:
+            if abs((store.from_ts(f["ts"]).date() - datetime.strptime(day, "%Y-%m-%d").date()).days) > 1:
+                continue
+            if cov.pair_match(f["teams"], teams):
+                return f["tier"]
+        return None
 
     # --- in-game checkpoint --------------------------------------------------
     def checkpoint_status(self, map_record: dict) -> str:

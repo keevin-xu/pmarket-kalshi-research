@@ -13,10 +13,14 @@ tests. No test hits a live vendor.
 """
 from __future__ import annotations
 
+import logging
 import ssl
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any
+
+log = logging.getLogger("ingest")
 
 try:  # a proper CA bundle — some Python builds ship no system certs
     import certifi
@@ -45,6 +49,59 @@ class VendorError(RuntimeError):
     def is_refusal(self) -> bool:
         s = self.status
         return s == 0 or s == 429 or (s is not None and 500 <= s < 600)
+
+
+class Refused(VendorError):
+    """A vendor refused repeatedly (429/5xx/transport). Distinct from a plain
+    VendorError so a per-item handler cannot mistake a sustained outage for
+    "this market simply has no data" — that swallow writes the outage into the
+    archive as a fact about the market."""
+
+
+class Pacer:
+    """Self-imposed request spacing for BULK reads (backfill, census sweeps).
+
+    Neither venue publishes a rate-limit or Retry-After header, so our own
+    spacing is the only protection. Kalshi refused at ~7 req/s during recon
+    and was clean at ~3.
+    """
+
+    def __init__(self, interval_s: float):
+        self.interval_s = interval_s
+        self._last = 0.0
+
+    def wait(self) -> None:
+        gap = self.interval_s - (time.monotonic() - self._last)
+        if gap > 0:
+            time.sleep(gap)
+        self._last = time.monotonic()
+
+
+def with_retries(fn, *, pacer: Pacer, venue: str, what: str,
+                 max_tries: int = 4, backoff_s: float = 15.0):
+    """Run a paced vendor call, backing off on refusals and FAILING LOUDLY if
+    they persist. Never returns empty on refusal — a 429 is an outage, and
+    reporting it as "no rows" is how a rate limit becomes a research verdict.
+
+    For bulk readers only. The recorder deliberately does NOT use this: it
+    wants a refusal to trip its per-venue breaker immediately and keep the
+    other venue recording.
+    """
+    for attempt in range(max_tries):
+        pacer.wait()
+        try:
+            return fn()
+        except VendorError as e:
+            if not e.is_refusal():
+                raise                            # 404 etc. = a per-item gap
+            if attempt == max_tries - 1:
+                break
+            wait = backoff_s * (attempt + 1)
+            log.warning("REFUSAL %s %s (%r) — backing off %.0fs (%d/%d)",
+                        venue, what, e, wait, attempt + 1, max_tries)
+            time.sleep(wait)
+    raise Refused(f"{venue} {what}: refused {max_tries} times; stopping rather "
+                  f"than reporting an outage as no data")
 
 
 def require_aware_utc(dt: datetime) -> datetime:

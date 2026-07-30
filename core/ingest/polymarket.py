@@ -20,8 +20,13 @@ import urllib.request
 from datetime import datetime, timezone
 
 from core.config import CONFIG
-from core.ingest.base import (HTTP_HEADERS, SSL_CONTEXT, Adapter, VendorError,
-                         best_bid_ask, mid_or_none)
+from core.ingest.base import (HTTP_HEADERS, SSL_CONTEXT, Adapter, Pacer,
+                              VendorError, best_bid_ask, mid_or_none)
+
+# Offset pagination walks many pages in a tight loop; space them so a bulk
+# sweep cannot trip the rate limit. Single-market calls (book, history) are
+# paced by their caller.
+_PAGE_PACE = Pacer(CONFIG.backfill.polymarket_min_interval_s)
 
 
 def _maybe_json_list(v):
@@ -71,6 +76,7 @@ class PolymarketAdapter(Adapter):
         so an out-of-window truncation degrades gracefully instead of lying."""
         offset = 0
         while True:
+            _PAGE_PACE.wait()
             try:
                 page = self.fetch(self.gamma, "events", tag_slug=tag,
                                  closed=(None if closed is None else str(closed).lower()),

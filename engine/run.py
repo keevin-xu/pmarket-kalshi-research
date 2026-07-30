@@ -98,13 +98,17 @@ def run_g0(conn, sport, oe_paths: list[str], *, live_depth: bool = True) -> dict
     map_cov = _map_coverage(sport, oe_paths, cp)
 
     depth = {}
+    # Scope the depth read to THIS run's own observations, so a previous run's
+    # market population cannot survive into this number.
+    depth_since = store.to_ts(datetime.now(timezone.utc))
     if live_depth:
         try:
             sweep.sweep_polymarket_live_depth(sport, conn)
         except Exception as e:                              # a hiccup must not fake a number
             depth["_error"] = f"live depth sweep failed: {e!r}"
     for regime in (CONFIG.regimes.PRE_MATCH, CONFIG.regimes.IN_GAME):
-        depth[regime] = depthmod.depth_at_signal_moments(conn, CONFIG.venues.POLYMARKET, regime)
+        depth[regime] = depthmod.depth_at_signal_moments(
+            conn, CONFIG.venues.POLYMARKET, regime, since=depth_since)
 
     min_depth = cp.min_depth_usd_per_side
     pm_depth_vals = [d.get("median_usd") for d in depth.values()

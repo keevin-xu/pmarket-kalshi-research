@@ -56,10 +56,12 @@ CS2_PARAMS = SportParams(
         coverage_join_tolerance_min=90,
         team_match_threshold=0.85,
         tier1_leagues=("s",),                  # NEUTRAL tier codes, not names
-        # Proposal only: replaced at backfill by the OBSERVED Kalshi
-        # market-retention floor, recorded with its pull date. Kalshi drops
-        # market-level rows older than ~68 days, so this floor moves.
-        window_start="2026-05-23T00:00:00.000Z",
+        # FROZEN at the G0 FREEZE (2026-07-30) to the OBSERVED Kalshi
+        # market-retention floor: the earliest market row the 2026-07-30
+        # backfill could retrieve was 2026-05-25T00:07Z. Kalshi drops
+        # market-level rows older than ~68 days, so a later pull would find a
+        # LATER floor — this value is only reproducible from the archive.
+        window_start="2026-05-25T00:00:00.000Z",
     ),
     parity=ParityParams(
         min_family_pass_rate=0.95,             # proposal (G1)

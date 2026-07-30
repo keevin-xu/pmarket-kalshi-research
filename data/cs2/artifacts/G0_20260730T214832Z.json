@@ -1,0 +1,167 @@
+{
+  "caveats": [
+    "coverage counts SERIES ((team-pair, day)); neutral gameid is per-map.",
+    "depth is LIVE-only (settled books are gone at resolution); a one-shot snapshot, top-of-book only \u2014 the binding number needs the recorder.",
+    "cross-venue window is bounded by Kalshi's launch for this sport; low coverage %% reflects short venue history, not poor matching."
+  ],
+  "coverage": {
+    "coverage_pct": 0.6698113207547169,
+    "covered_match_ids": [
+      "bo3:121381",
+      "bo3:121382",
+      "bo3:121431",
+      "bo3:121432",
+      "bo3:121433",
+      "bo3:121434",
+      "bo3:121436",
+      "bo3:121435",
+      "bo3:121438",
+      "bo3:121437",
+      "bo3:121439",
+      "bo3:121440",
+      "bo3:121441",
+      "bo3:121452",
+      "bo3:121457",
+      "bo3:121459",
+      "bo3:121460",
+      "bo3:121461",
+      "bo3:121462",
+      "bo3:121463",
+      "bo3:121464",
+      "bo3:121465",
+      "bo3:121467",
+      "bo3:121466",
+      "bo3:121469",
+      "bo3:121468",
+      "bo3:121471",
+      "bo3:121470",
+      "bo3:121472",
+      "bo3:121473",
+      "bo3:121474",
+      "bo3:121922",
+      "bo3:121921",
+      "bo3:121920",
+      "bo3:121924",
+      "bo3:121917",
+      "bo3:121919",
+      "bo3:121923",
+      "bo3:121918",
+      "bo3:121925",
+      "bo3:121926",
+      "bo3:121927",
+      "bo3:121928",
+      "bo3:121930",
+      "bo3:121929",
+      "bo3:121931",
+      "bo3:121932",
+      "bo3:121933",
+      "bo3:121934",
+      "bo3:121935",
+      "bo3:121936",
+      "bo3:121938",
+      "bo3:121937",
+      "bo3:121940",
+      "bo3:121939",
+      "bo3:121941",
+      "bo3:121942",
+      "bo3:121944",
+      "bo3:121943",
+      "bo3:121945",
+      "bo3:121946",
+      "bo3:121947",
+      "bo3:121948",
+      "bo3:121949",
+      "bo3:121623",
+      "bo3:121624",
+      "bo3:121625",
+      "bo3:121626",
+      "bo3:121628",
+      "bo3:121627",
+      "bo3:121629"
+    ],
+    "existence": {
+      "kalshi": [
+        "map_winner",
+        "match_winner"
+      ],
+      "polymarket": [
+        "map_winner"
+      ]
+    },
+    "gate_min_covered": 60,
+    "n_covered": 71,
+    "n_tier1_series": 106,
+    "passes_coverage": true,
+    "per_family_covered": {
+      "map_winner": 69
+    }
+  },
+  "depth_gate_pass": false,
+  "depth_live_polymarket": {
+    "in_game": {
+      "max_usd": 491.4,
+      "median_usd": 5.275,
+      "min_usd": 0.06,
+      "n": 14,
+      "p25_usd": 2.3,
+      "p75_usd": 97.6,
+      "regime": "in_game",
+      "source": "live",
+      "venue": "polymarket"
+    },
+    "pre_match": {
+      "max_usd": 156.0,
+      "median_usd": 5.385,
+      "min_usd": 0.16,
+      "n": 58,
+      "p25_usd": 0.87,
+      "p75_usd": 19.17,
+      "regime": "pre_match",
+      "source": "live",
+      "venue": "polymarket"
+    }
+  },
+  "frozen_rules": {
+    "event_block_unit": "tournament",
+    "families_phase1": [
+      "map_winner"
+    ],
+    "min_covered_maps": 100,
+    "min_covered_matches": 60,
+    "min_depth_usd_per_side": 250.0,
+    "min_event_blocks": 6,
+    "tier1_leagues": [
+      "s"
+    ],
+    "window_start": "2026-05-25T00:00:00.000Z"
+  },
+  "gate": "G0",
+  "map_coverage": {
+    "applies": true,
+    "blocks": {
+      "match": 69,
+      "tournament": 3
+    },
+    "event_block_unit": "tournament",
+    "n_blocks_judged": 3,
+    "n_covered_maps": 136,
+    "n_neutral_maps": 202,
+    "passes_blocks": false,
+    "passes_maps": true
+  },
+  "per_family_verdict": {
+    "map_winner": {
+      "both_venues_exist": true,
+      "go_to_G1": false,
+      "n_covered": 69,
+      "sample_gate_passed": false
+    }
+  },
+  "polymarket_sweep": {
+    "in_window_truncated": false,
+    "n_records": 2594,
+    "oldest_ts": "2026-05-25T00:00:00.000Z",
+    "pagination_capped": false
+  },
+  "sport": "cs2"
+}
