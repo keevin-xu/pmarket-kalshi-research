@@ -17,8 +17,14 @@ from core.census import coverage as cov
 from core.census import sweep
 from core.config import CONFIG
 from core.db import store
+from core.ingest.base import Pacer, with_retries
 from core.ingest.kalshi import KalshiAdapter
 from core.ingest.polymarket import PolymarketAdapter
+# Bulk per-map vendor reads: paced like the backfill so a gate cannot die
+# half-swept on a rate limit (a vendor refusal is an outage, not a finding).
+_K_PACE = Pacer(CONFIG.backfill.kalshi_min_interval_s)
+_P_PACE = Pacer(CONFIG.backfill.polymarket_min_interval_s)
+
 from core.parity.settlement import _dedup, _find
 from core.reference.calibration import CalibrationPoint
 
@@ -73,8 +79,12 @@ def build_points(sport, oe_paths: list[str], *, kalshi: KalshiAdapter | None = N
         k_ticker = next((tk for team, tk in (krec.get("team_markets") or {}).items()
                          if team and cov.team_match(team_a, team)), None)
         if k_ticker:
-            candles = kalshi.candlesticks(krec.get("series"), k_ticker,
-                                          kickoff - 86400, kickoff + 7200, 1)
+            candles = with_retries(
+                lambda: kalshi.candlesticks(krec.get("series"), k_ticker,
+                                            kickoff - 86400, kickoff + 7200, 1),
+                pacer=_K_PACE, venue=CONFIG.venues.KALSHI, what=f"candles/{k_ticker}",
+                max_tries=CONFIG.backfill.max_refusal_retries,
+                backoff_s=CONFIG.backfill.refusal_backoff_s)
             for regime, tgt in targets.items():
                 mid = KalshiAdapter.candle_mid_at(candles, tgt)
                 if mid is not None:
@@ -85,7 +95,11 @@ def build_points(sport, oe_paths: list[str], *, kalshi: KalshiAdapter | None = N
         idx = _side_key(prec.get("outcomes") or [], team_a)
         toks = prec.get("tokens") or []
         if idx is not None and idx < len(toks):
-            hist = poly.prices_history(toks[idx])
+            hist = with_retries(
+                lambda: poly.prices_history(toks[idx]),
+                pacer=_P_PACE, venue=CONFIG.venues.POLYMARKET, what="history",
+                max_tries=CONFIG.backfill.max_refusal_retries,
+                backoff_s=CONFIG.backfill.refusal_backoff_s)
             for regime, tgt in targets.items():
                 pr = _pm_price_at(hist, tgt)
                 if pr is not None:

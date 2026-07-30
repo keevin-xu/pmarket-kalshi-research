@@ -12,8 +12,14 @@ from core.census import coverage as cov
 from core.census import sweep
 from core.config import CONFIG
 from core.db import store
+from core.ingest.base import Pacer, with_retries
 from core.ingest.kalshi import KalshiAdapter
 from core.ingest.polymarket import PolymarketAdapter
+# Bulk per-map vendor reads: paced like the backfill so a gate cannot die
+# half-swept on a rate limit (a vendor refusal is an outage, not a finding).
+_K_PACE = Pacer(CONFIG.backfill.kalshi_min_interval_s)
+_P_PACE = Pacer(CONFIG.backfill.polymarket_min_interval_s)
+
 from core.parity.settlement import _dedup, _find
 from core.reference.calib_data import _side_key
 
@@ -68,10 +74,18 @@ def build_map_series(sport, oe_paths: list[str], *, kalshi: KalshiAdapter | None
         if not k_ticker or idx is None or idx >= len(toks):
             continue
 
-        candles = kalshi.candlesticks(krec.get("series"), k_ticker,
-                                      kickoff - _PREROLL_S, map_end + 300, 1)
+        candles = with_retries(
+            lambda: kalshi.candlesticks(krec.get("series"), k_ticker,
+                                        kickoff - _PREROLL_S, map_end + 300, 1),
+            pacer=_K_PACE, venue=CONFIG.venues.KALSHI, what=f"candles/{k_ticker}",
+            max_tries=CONFIG.backfill.max_refusal_retries,
+            backoff_s=CONFIG.backfill.refusal_backoff_s)
         k_series = _kalshi_mid_series(candles)
-        p_hist = poly.prices_history(toks[idx])
+        p_hist = with_retries(
+            lambda: poly.prices_history(toks[idx]),
+            pacer=_P_PACE, venue=CONFIG.venues.POLYMARKET, what="history",
+            max_tries=CONFIG.backfill.max_refusal_retries,
+            backoff_s=CONFIG.backfill.refusal_backoff_s)
         p_series = [(int(pt["t"]), float(pt["p"])) for pt in p_hist
                     if kickoff - _PREROLL_S <= int(pt["t"]) <= map_end + 300]
         if len(k_series) < 2 or len(p_series) < 2:

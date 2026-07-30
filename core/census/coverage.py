@@ -79,8 +79,12 @@ def team_match(a: str, b: str, threshold: float | None = None) -> bool:
     aa, ab = acronym(a), acronym(b)               # word-initials of raw name
     sa, sb = na.replace(" ", ""), nb.replace(" ", "")  # suffix-stripped compact
     ca, cb = _compact_full(a), _compact_full(b)   # full compact (keeps suffix)
-    # acronym of one equals the other's compact/acronym: HLE, AL, GG cases
-    if aa and (aa == sb or aa == cb or aa == ab):
+    # Acronym of one equals the other's COMPACT NAME: HLE/Hanwha Life Esports,
+    # AL/Anyone's Legend. Note there is deliberately NO acronym==acronym rule:
+    # a single-token name has a one-letter acronym, so it would make every pair
+    # sharing a first letter the same team (MOUZ/MIBR, BIG/B8, T1/TES) and
+    # silently join unrelated fixtures.
+    if aa and (aa == sb or aa == cb):
         return True
     if ab and (ab == sa or ab == ca):
         return True

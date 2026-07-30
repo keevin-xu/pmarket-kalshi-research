@@ -104,3 +104,23 @@ def test_map_floor_is_inert_for_sports_that_did_not_set_it():
     from core.sport import CensusParams
     from engine import run as engine_run
     assert engine_run._map_coverage(None, [], CensusParams()) == {"applies": False}
+
+
+def test_two_names_sharing_a_first_letter_are_not_the_same_team():
+    """A single-token name has a one-letter acronym. An acronym==acronym rule
+    therefore joined every pair sharing a first letter — MOUZ/MIBR, BIG/B8,
+    T1/TES — silently pairing unrelated fixtures across venues."""
+    from core.census.coverage import pair_match, team_match
+    for a, b in (("MOUZ", "MIBR"), ("BIG", "B8"), ("SINNERS", "Sharks"),
+                 ("T1", "TES"), ("G2", "GEN"), ("FaZe", "Falcons"),
+                 ("Team Liquid", "Team Lions")):
+        assert not team_match(a, b), (a, b)
+    assert not pair_match(("TYLOO", "SINNERS"), ("TYLOO", "Sharks"))
+
+
+def test_derivable_abbreviations_still_match():
+    from core.census.coverage import team_match
+    for a, b in (("HLE", "Hanwha Life Esports"), ("AL", "Anyone's Legend"),
+                 ("JDG", "JD Gaming"), ("The MongolZ", "TheMongolz"),
+                 ("BetBoom", "BetBoom Team"), ("Lifes A Game", "LAG")):
+        assert team_match(a, b), (a, b)

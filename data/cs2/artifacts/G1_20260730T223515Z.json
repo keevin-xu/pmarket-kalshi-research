@@ -1,0 +1,201 @@
+{
+  "agreement_rate": 0.8823529411764706,
+  "caveats": [
+    "neutral source is the arbiter; venue-vs-venue agreement is the gate.",
+    "resolution source differs (Kalshi governing-league vs Polymarket UMA/gol.gg) \u2014 documented caveat, not a fail, given agreement + voids hold."
+  ],
+  "disagreements_sample": [
+    {
+      "kalshi": "Sharks",
+      "kind": "winner_mismatch",
+      "map_no": 1,
+      "oe": "TYLOO",
+      "polymarket": "TYLOO",
+      "teams": [
+        "TYLOO",
+        "SINNERS"
+      ]
+    },
+    {
+      "kalshi": "GamerLegion",
+      "kind": "winner_mismatch",
+      "map_no": 1,
+      "oe": "BetBoom",
+      "polymarket": "BetBoom Team",
+      "teams": [
+        "GamerLegion",
+        "BetBoom"
+      ]
+    },
+    {
+      "kalshi": "Sharks",
+      "kind": "winner_mismatch",
+      "map_no": 1,
+      "oe": "Sharks",
+      "polymarket": "TYLOO",
+      "teams": [
+        "TYLOO",
+        "Sharks"
+      ]
+    },
+    {
+      "kalshi": "GamerLegion",
+      "kind": "winner_mismatch",
+      "map_no": 2,
+      "oe": "BetBoom",
+      "polymarket": "BetBoom Team",
+      "teams": [
+        "GamerLegion",
+        "BetBoom"
+      ]
+    },
+    {
+      "kalshi": "BetBoom",
+      "kind": "winner_mismatch",
+      "map_no": 1,
+      "oe": "BIG",
+      "polymarket": "MIBR",
+      "teams": [
+        "MIBR",
+        "BIG"
+      ]
+    },
+    {
+      "kalshi": "BetBoom",
+      "kind": "winner_mismatch",
+      "map_no": 1,
+      "oe": "BetBoom",
+      "polymarket": "MIBR",
+      "teams": [
+        "BetBoom",
+        "M80"
+      ]
+    },
+    {
+      "kalshi": "Monte",
+      "kind": "winner_mismatch",
+      "map_no": 2,
+      "oe": "B8",
+      "polymarket": "B8",
+      "teams": [
+        "MIBR",
+        "B8"
+      ]
+    },
+    {
+      "kalshi": "BetBoom",
+      "kind": "winner_mismatch",
+      "map_no": 1,
+      "oe": "MIBR",
+      "polymarket": "MIBR",
+      "teams": [
+        "MIBR",
+        "B8"
+      ]
+    },
+    {
+      "kalshi": "Monte",
+      "kind": "winner_mismatch",
+      "map_no": 2,
+      "oe": "Monte",
+      "polymarket": "B8",
+      "teams": [
+        "Monte",
+        "BetBoom"
+      ]
+    },
+    {
+      "kalshi": "BetBoom",
+      "kind": "winner_mismatch",
+      "map_no": 1,
+      "oe": "BetBoom",
+      "polymarket": "MIBR",
+      "teams": [
+        "Monte",
+        "BetBoom"
+      ]
+    },
+    {
+      "kalshi": "G2",
+      "kind": "winner_mismatch",
+      "map_no": 1,
+      "oe": "G2",
+      "polymarket": "B8",
+      "teams": [
+        "G2",
+        "BIG"
+      ]
+    },
+    {
+      "kalshi": "BetBoom",
+      "kind": "winner_mismatch",
+      "map_no": 2,
+      "oe": "The MongolZ",
+      "polymarket": "TheMongolz",
+      "teams": [
+        "The MongolZ",
+        "B8"
+      ]
+    },
+    {
+      "kalshi": "BetBoom",
+      "kind": "winner_mismatch",
+      "map_no": 2,
+      "oe": "BetBoom",
+      "polymarket": "FURIA",
+      "teams": [
+        "Falcons",
+        "BetBoom"
+      ]
+    },
+    {
+      "kalshi": "BetBoom",
+      "kind": "winner_mismatch",
+      "map_no": 1,
+      "oe": "BetBoom",
+      "polymarket": "FURIA",
+      "teams": [
+        "Falcons",
+        "BetBoom"
+      ]
+    },
+    {
+      "kalshi": "FURIA",
+      "kind": "winner_mismatch",
+      "map_no": 2,
+      "oe": "FUT",
+      "polymarket": "FUT Esports",
+      "teams": [
+        "B8",
+        "FUT"
+      ]
+    },
+    {
+      "kalshi": "FURIA",
+      "kind": "winner_mismatch",
+      "map_no": 1,
+      "oe": "B8",
+      "polymarket": "B8",
+      "teams": [
+        "B8",
+        "FUT"
+      ]
+    }
+  ],
+  "family": "map_winner",
+  "frozen_rules": {
+    "min_aligned_maps": 30,
+    "min_family_pass_rate": 0.95
+  },
+  "gate": "G1",
+  "n_agree": 120,
+  "n_aligned_played_maps": 136,
+  "n_void_breaks": 0,
+  "oe_agreement": {
+    "kalshi": 0.9411764705882353,
+    "polymarket": 0.9338235294117647
+  },
+  "passed_gate": false,
+  "sport": "cs2",
+  "verdict": "FAIL \u2014 claims differ / void mismatch"
+}
