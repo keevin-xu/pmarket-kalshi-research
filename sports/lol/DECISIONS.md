@@ -564,3 +564,48 @@ a trade. Per the frozen rule it is **judged again at the bounded date
 2026-09-30** after recorder accrual (which alone can harden the sample,
 supply the honest tier-1 depth number, and live-corroborate the in-game
 lead). No threshold may move in the interim. All gates G0–G4 complete.
+
+## [2026-07-30] CORRECTION — "Kalshi LoL launched ~2 months before this run" was a retention artifact
+
+Raised from CS2 recon (`sports/cs2/DECISIONS.md` [2026-07-30] NOTE — Kalshi
+market history is a ROLLING ~68-day window). Append-only: the original
+entries stand; this entry retracts one *inference* drawn in them.
+
+**Retracted claim.** The [2026-07-13] G0 entry reads "oldest close_time
+**2026-05-06** → Kalshi LoL launched ~2 months before this run", and the
+[2026-07-22] G2/G3 entry reads "Kalshi LoL history starts 2026-05-16". The
+observed dates were correct at the time of those pulls; the *causal reading*
+— that they mark a Kalshi LoL product launch — is wrong.
+
+**Evidence.** Kalshi's API retains market-level rows (prices, candlesticks,
+settlement) only for roughly the last **68 days**, platform-wide. Older
+events survive as shells: `/events?status=settled` still lists them, while
+`/markets?event_ticker=…` returns zero markets. Measured 2026-07-30:
+- `KXLOLMAP` settled events list back to **2026-01-14**, but markets are
+  absent for every event through **2026-05-23** and present from
+  **2026-05-24** onward (day-by-day across the boundary).
+- `KXCS2MAP` (a different sport, same platform) shows the identical
+  boundary: markets absent through 2026-05-22, present from 2026-05-23.
+- The boundary tracks the calendar: 2026-05-06 as of the 07-13 pull (68 d),
+  2026-05-16 as of the 07-22 pull (67 d), 2026-05-24 as of the 07-30 pull
+  (67 d).
+
+**What this does and does not change.**
+- **No frozen threshold moves. No prior LoL run is invalidated.** G0–G4
+  verdicts stand as recorded; the retracted sentence played no part in any
+  pass/fail decision (the G0 gate is an absolute covered-match count, and
+  the G4 blockers were depth, recorder corroboration and sample length).
+- It *does* change the interpretation of "the cross-venue overlap window is
+  ~2026-05 → present". That window was not a product-availability fact but a
+  data-retention fact, and it **moves forward every day**.
+- **Material for the 2026-09-30 bounded re-judge:** the LoL historical
+  Kalshi rows behind G2/G3 are no longer re-fetchable from the vendor —
+  by 2026-09-30 the retrievable Kalshi window will start ~2026-07-24, after
+  the Oracle's Elixir outcome coverage that G2/G3 relied on. Whatever is
+  already persisted in `data/lol/db/pmk.db` and `data/lol/raw/` is the only
+  surviving copy. Two consequences, both measurement-integrity rather than
+  threshold matters: (1) that store and archive must be treated as
+  irreplaceable and backed up before the re-judge; (2) the re-judge's added
+  sample can only come from the live recorder, which is what the [2026-07-22]
+  G4 entry already required — this correction strengthens that requirement
+  and removes any expectation that history could be re-pulled to widen n.

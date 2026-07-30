@@ -1,18 +1,33 @@
 # secrets & env
 .env
 *.key
+
 # python
 __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
 venv/
-# data — never commit db or raw vendor dumps
-data/db/*
-!data/db/.gitkeep
-data/raw/*
-!data/raw/.gitkeep
-data/artifacts/*
-!data/artifacts/.gitkeep
+
+# data — never commit databases or raw vendor dumps.
+# Paths are per-sport since the multi-sport refactor (data/<sport>/...);
+# the old data/db, data/raw, data/artifacts rules matched nothing.
+data/*/db/*
+!data/*/db/.gitkeep
+data/*/raw/*
+!data/*/raw/.gitkeep
+
+# Run artifacts ARE versioned on purpose: every number in a report must
+# trace to a stored artifact, so the evidence trail belongs in git.
+# (data/<sport>/artifacts/*.json — intentionally not ignored.)
+
+# macOS
+.DS_Store
+
+# Markdown is ignored by default. CAVEAT: this also ignores every sport's
+# append-only DECISIONS.md — the file that is supposed to be the law — so a
+# ledger is only under review if it is force-added (`git add -f`), which is
+# how sports/lol/DECISIONS.md came to be tracked. Un-ignore explicitly below
+# for any doc that should be reviewable.
 *.md
 !README.md

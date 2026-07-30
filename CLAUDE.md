@@ -24,16 +24,30 @@ freezes on its own first real run. Gates run per sport:
 
 ## 0. What this project is
 
-A **measurement system, not a trading bot.** The question:
+A **measurement system, not a trading bot.** One question, asked
+per sport (LoL, CS2, Valorant, cricket, …):
 
-> Is Kalshi a usable price reference for trading League of Legends on
-> Polymarket — i.e. is Kalshi both **calibrated** (its prices match
-> realized outcomes) and does it **lead** Polymarket (Polymarket drifts
-> toward Kalshi, not vice-versa) — per regime (pre-match, in-game)?
+> Is Kalshi a usable price **reference** for trading this sport on
+> Polymarket? A reference is usable only if it is BOTH:
+>   • **calibrated** — its prices, read as probabilities, match realized
+>     outcome frequencies (its number is *true*); AND
+>   • **leading** — when the two venues diverge, Polymarket drifts toward
+>     Kalshi, not vice-versa (it gets there *first*).
+> Measured **per regime** (pre-match, in-game), because leadership can
+> flip between them.
+
+Why both: calibration without lead means the truth arrives too late to
+trade; lead without calibration means we'd converge toward a
+fast-but-wrong book (negative CLV). The venue that is both is the
+reference; the other venue is the tradeable laggard. Execution intent is
+Polymarket, but the analysis is **direction-agnostic** — if Polymarket is
+the calibrated leader, the trade flips to Kalshi (its extra costs noted,
+not traded here).
 
 The deliverable is a trustworthy number and a **go/no-go verdict**, not
 a strategy. A clean "Kalshi is not a usable reference / there is no
-tradeable lead-lag" is a **successful outcome**, not a failure.
+tradeable lead-lag" is a **successful outcome**, not a failure. Each
+sport is judged independently on its own frozen rules and its own ledger.
 
 We do NOT trade in this repo. We decide whether a later, separate
 project *could*.
@@ -125,12 +139,20 @@ before these pass is producing confident, wrong numbers.
 
 ## 6. Ground truth
 
-- **Grade outcomes against a NEUTRAL results source** (Oracle's Elixir
-  or PandaScore match results), never a venue's own settlement. Both
-  venues are scored against the same independent answer key.
+- **Grade outcomes against a NEUTRAL results source**, never a venue's
+  own settlement. Both venues are scored against the same independent
+  answer key. The neutral source is per sport, declared in that sport's
+  plugin (e.g. LoL = Oracle's Elixir CSV; CS2 = bo3.gg / Liquipedia; a
+  paid feed like PandaScore is a fallback). Pin its schema in the sport's
+  `DECISIONS.md` on first pull; validate before trusting.
 - The neutral source is also how we verify each venue actually *covers*
   a match — join by fuzzy team name within a time tolerance against a
   neutral schedule, never trust a feed's self-reported coverage.
+- The neutral source also defines the **in-game checkpoint** for
+  calibration, which is sport-specific: a game-clock instant (LoL:
+  kickoff+600s) or a discrete game state (CS2: the round-12 side switch /
+  halftime). It must be a DEFINED mid-game state, never the last tick
+  before resolution (which collapses into the outcome).
 
 ## 7. Determinism & restart safety
 
