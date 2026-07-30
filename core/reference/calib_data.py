@@ -1,5 +1,11 @@
 """G2 dataset builder: snapshot each covered map's price on BOTH venues at
-the frozen point-in-time, paired with the neutral Oracle's Elixir outcome.
+the frozen point-in-time, paired with the neutral outcome.
+
+Prices come from the LOCAL STORE (`source='hist'`), not from the vendors.
+Both venues' history rolls off — Kalshi ~68 days, Polymarket ~30 — so a gate
+that re-fetches sees less than the run before it and its numbers stop being
+reproducible in the one direction nobody checks. A map with no stored series
+is a counted skip, never a fabricated point.
 
 One point per map, per venue, per regime, using the Blue-side team (team_a):
 price = P(team_a wins the map), outcome = 1 iff OE says team_a won. Snapshot
@@ -46,10 +52,30 @@ def _side_key(names, team_a: str):
     return None
 
 
-def build_points(sport, oe_paths: list[str], *, kalshi: KalshiAdapter | None = None,
+def pm_series_for_team(conn, prec: dict, team_a: str) -> list[tuple[int, float]]:
+    """Polymarket series as P(team_a wins), from the store.
+
+    The backfill stores ONE series per market — the probability of
+    `outcomes[0]`, since a binary CLOB's other leg is its complement. So when
+    team_a is the second outcome the series must be INVERTED; using it as-is
+    would silently score every such map against the wrong side.
+    """
+    outs = prec.get("outcomes") or []
+    raw = store.price_series(conn, prec.get("contract_id"), field="last")
+    if not raw or not outs:
+        return []
+    if cov.team_match(team_a, outs[0]):
+        return raw
+    if len(outs) > 1 and cov.team_match(team_a, outs[1]):
+        return [(t, round(1.0 - p, 6)) for t, p in raw]
+    return []
+
+
+def build_points(sport, oe_paths: list[str], *, conn=None,
+                 kalshi: KalshiAdapter | None = None,
                  poly: PolymarketAdapter | None = None) -> list[CalibrationPoint]:
-    kalshi = kalshi or KalshiAdapter()
-    poly = poly or PolymarketAdapter()
+    if conn is None:
+        raise ValueError("build_points reads the local store; pass a connection")
     checkpoint_s = sport.params.reference.in_game_checkpoint_s
 
     oe = sport.load_map_results(oe_paths)
@@ -75,34 +101,22 @@ def build_points(sport, oe_paths: list[str], *, kalshi: KalshiAdapter | None = N
         if gamelen and gamelen >= checkpoint_s:
             targets[CONFIG.regimes.IN_GAME] = kickoff + checkpoint_s
 
-        # --- Kalshi: team_a's market -> candlesticks -> mid at target(s) ------
+        # --- Kalshi: team_a's market -> stored MID series (no de-vig) ---------
         k_ticker = next((tk for team, tk in (krec.get("team_markets") or {}).items()
                          if team and cov.team_match(team_a, team)), None)
         if k_ticker:
-            candles = with_retries(
-                lambda: kalshi.candlesticks(krec.get("series"), k_ticker,
-                                            kickoff - 86400, kickoff + 7200, 1),
-                pacer=_K_PACE, venue=CONFIG.venues.KALSHI, what=f"candles/{k_ticker}",
-                max_tries=CONFIG.backfill.max_refusal_retries,
-                backoff_s=CONFIG.backfill.refusal_backoff_s)
+            k_series = store.price_series(conn, k_ticker, field="mid")
             for regime, tgt in targets.items():
-                mid = KalshiAdapter.candle_mid_at(candles, tgt)
+                mid = store.price_at(k_series, tgt)
                 if mid is not None:
                     points.append(CalibrationPoint(m["match_id"], CONFIG.venues.KALSHI,
                                                    regime, mid, outcome))
 
-        # --- Polymarket: team_a's token -> prices-history -> price at target(s)
-        idx = _side_key(prec.get("outcomes") or [], team_a)
-        toks = prec.get("tokens") or []
-        if idx is not None and idx < len(toks):
-            hist = with_retries(
-                lambda: poly.prices_history(toks[idx]),
-                pacer=_P_PACE, venue=CONFIG.venues.POLYMARKET, what="history",
-                max_tries=CONFIG.backfill.max_refusal_retries,
-                backoff_s=CONFIG.backfill.refusal_backoff_s)
-            for regime, tgt in targets.items():
-                pr = _pm_price_at(hist, tgt)
-                if pr is not None:
-                    points.append(CalibrationPoint(m["match_id"], CONFIG.venues.POLYMARKET,
-                                                   regime, pr, outcome))
+        # --- Polymarket: stored LAST series, oriented to team_a ---------------
+        p_series = pm_series_for_team(conn, prec, team_a)
+        for regime, tgt in targets.items():
+            pr = store.price_at(p_series, tgt)
+            if pr is not None:
+                points.append(CalibrationPoint(m["match_id"], CONFIG.venues.POLYMARKET,
+                                               regime, pr, outcome))
     return points

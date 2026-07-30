@@ -21,6 +21,7 @@ _K_PACE = Pacer(CONFIG.backfill.kalshi_min_interval_s)
 _P_PACE = Pacer(CONFIG.backfill.polymarket_min_interval_s)
 
 from core.parity.settlement import _dedup, _find
+from core.reference import calib_data
 from core.reference.calib_data import _side_key
 
 _PREROLL_S = 6 * 3600      # look back 6h before kickoff for pre-match divergences
@@ -42,10 +43,13 @@ def _kalshi_mid_series(candles: list[dict]) -> list[tuple[int, float]]:
     return out
 
 
-def build_map_series(sport, oe_paths: list[str], *, kalshi: KalshiAdapter | None = None,
+def build_map_series(sport, oe_paths: list[str], *, conn=None,
+                     kalshi: KalshiAdapter | None = None,
                      poly: PolymarketAdapter | None = None) -> list[dict]:
-    kalshi = kalshi or KalshiAdapter()
-    poly = poly or PolymarketAdapter()
+    """Paired intraday series per covered map, read from the LOCAL STORE.
+    Vendor history rolls off; the store is the system of record."""
+    if conn is None:
+        raise ValueError("build_map_series reads the local store; pass a connection")
 
     oe = sport.load_map_results(oe_paths)
     krecs = _dedup(sweep.sweep_kalshi_map_results(sport))
@@ -74,20 +78,10 @@ def build_map_series(sport, oe_paths: list[str], *, kalshi: KalshiAdapter | None
         if not k_ticker or idx is None or idx >= len(toks):
             continue
 
-        candles = with_retries(
-            lambda: kalshi.candlesticks(krec.get("series"), k_ticker,
-                                        kickoff - _PREROLL_S, map_end + 300, 1),
-            pacer=_K_PACE, venue=CONFIG.venues.KALSHI, what=f"candles/{k_ticker}",
-            max_tries=CONFIG.backfill.max_refusal_retries,
-            backoff_s=CONFIG.backfill.refusal_backoff_s)
-        k_series = _kalshi_mid_series(candles)
-        p_hist = with_retries(
-            lambda: poly.prices_history(toks[idx]),
-            pacer=_P_PACE, venue=CONFIG.venues.POLYMARKET, what="history",
-            max_tries=CONFIG.backfill.max_refusal_retries,
-            backoff_s=CONFIG.backfill.refusal_backoff_s)
-        p_series = [(int(pt["t"]), float(pt["p"])) for pt in p_hist
-                    if kickoff - _PREROLL_S <= int(pt["t"]) <= map_end + 300]
+        lo, hi = kickoff - _PREROLL_S, map_end + 300
+        k_series = store.price_series(conn, k_ticker, field="mid", lo=lo, hi=hi)
+        p_series = [(t, p) for t, p in calib_data.pm_series_for_team(conn, prec, team_a)
+                    if lo <= t <= hi]
         if len(k_series) < 2 or len(p_series) < 2:
             continue
         maps.append({"match_id": m["match_id"], "kickoff": kickoff,

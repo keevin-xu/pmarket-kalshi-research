@@ -239,3 +239,43 @@ def record_discard(
         [stage, contract_id, match_id, to_ts(when or datetime.now(timezone.utc)), reason],
     )
     conn.commit()
+
+
+def price_series(conn, contract_id: str, *, field: str = "mid", source: str = "hist",
+                 lo: int | None = None, hi: int | None = None) -> list[tuple[int, float]]:
+    """A contract's stored price series as [(unix_ts, price)], time-ordered.
+
+    THE read path for calibration and lead-lag. Both venues' history rolls off
+    (Kalshi ~68 days, Polymarket ~30), so re-fetching from the vendor makes a
+    gate silently see less than the run before it; the local store is the
+    system of record and this is how it is read.
+
+    `field` is the venue's pre-registered reference price — 'mid' for an order
+    book (NEVER de-vigged), 'last' for a traded series. Rows whose field is
+    NULL are skipped: a gap stays a gap.
+    """
+    if field not in ("mid", "last", "bid", "ask"):
+        raise ValueError(f"refusing to read unknown price field {field!r}")
+    sql = (f"SELECT ts, {field} AS p FROM quotes "
+           "WHERE contract_id = ? AND source = ? AND " + field + " IS NOT NULL")
+    params: list = [contract_id, source]
+    if lo is not None:
+        sql += " AND ts >= ?"
+        params.append(to_ts(datetime.fromtimestamp(lo, timezone.utc)))
+    if hi is not None:
+        sql += " AND ts <= ?"
+        params.append(to_ts(datetime.fromtimestamp(hi, timezone.utc)))
+    sql += " ORDER BY ts ASC"
+    return [(int(from_ts(r["ts"]).timestamp()), float(r["p"]))
+            for r in conn.execute(sql, params)]
+
+
+def price_at(series: list[tuple[int, float]], target_ts: int) -> float | None:
+    """Last price at-or-before `target_ts` — no lookahead. None if the series
+    starts after the target (a gap, never the next available price)."""
+    best = None
+    for t, p in series:
+        if t > target_ts:
+            break
+        best = p
+    return best

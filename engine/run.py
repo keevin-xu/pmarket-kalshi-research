@@ -227,7 +227,7 @@ def run_g2(conn, sport, oe_paths: list[str]) -> dict:
     """G2 calibration per regime, judged vs the sport's reference params."""
     store.init_schema(conn)
     from core.reference import calib_data, calibration
-    points = calib_data.build_points(sport, oe_paths)
+    points = calib_data.build_points(sport, oe_paths, conn=conn)
     min_n = 50
     regimes = {}
     for regime in (CONFIG.regimes.PRE_MATCH, CONFIG.regimes.IN_GAME):
@@ -265,7 +265,7 @@ def run_g3(conn, sport, oe_paths: list[str]) -> dict:
     store.init_schema(conn)
     from core.reference import lead_lag, leadlag_data
     llp = sport.params.lead_lag
-    maps = leadlag_data.build_map_series(sport, oe_paths)
+    maps = leadlag_data.build_map_series(sport, oe_paths, conn=conn)
     preroll = leadlag_data._PREROLL_S
 
     regimes = {}
