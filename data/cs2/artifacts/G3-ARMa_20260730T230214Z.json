@@ -1,0 +1,48 @@
+{
+  "arm": "a",
+  "caveats": [
+    "series are Kalshi candle mid vs Polymarket prices-history last, as-of aligned (no lookahead / no fabricated fills).",
+    "if both venues reprice together the lead score ~0 with tight CI -> no tradeable lag despite a large instantaneous gap.",
+    "sample is the ~1-month history overlap; thin/CI-spanning results are resolved by recorder accrual, not a bar move."
+  ],
+  "family": "map_winner",
+  "frozen_rules": {
+    "ci_level": 0.95,
+    "confirmation_snapshots": 3,
+    "convergence_window_s": 300,
+    "divergence_threshold": 0.02,
+    "min_divergences": 30,
+    "sign": "positive lead score = Kalshi leads"
+  },
+  "gate": "G3",
+  "n_maps": 116,
+  "regimes": {
+    "in_game": {
+      "leader": "kalshi",
+      "n_divergences": 634,
+      "passed": true,
+      "regime": "in_game",
+      "signed_convergence": {
+        "ci_hi": 0.10950671641791045,
+        "ci_lo": 0.08093075684380033,
+        "n_blocks": 115,
+        "point": 0.09512697160883281
+      },
+      "verdict": "LEADS: kalshi (CI excludes 0)"
+    },
+    "pre_match": {
+      "leader": null,
+      "n_divergences": 611,
+      "passed": false,
+      "regime": "pre_match",
+      "signed_convergence": {
+        "ci_hi": 0.006631799163179918,
+        "ci_lo": -0.0003467741935483884,
+        "n_blocks": 105,
+        "point": 0.002962356792144027
+      },
+      "verdict": "no leader \u2014 CI spans 0; no tradeable cross-venue lag"
+    }
+  },
+  "sport": "cs2"
+}

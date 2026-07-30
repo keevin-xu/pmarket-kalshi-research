@@ -105,7 +105,8 @@ def looks_tier1(text: str) -> bool:
                for name in TIER1_NAMES)
 
 
-def is_tier1(text: str, tier: str | None = None) -> bool:
+def is_tier1(text: str, tier: str | None = None,
+             codes: tuple[str, ...] = (TIER1_CODE,)) -> bool:
     """True iff this fixture is tier-1, or iff tier CANNOT BE ESTABLISHED here.
 
     `tier` is the NEUTRAL source's own field (bo3.gg `matches.tier`) and is
@@ -122,5 +123,5 @@ def is_tier1(text: str, tier: str | None = None) -> bool:
     `load_all_matches`. Use `looks_tier1()` for the title hint itself.
     """
     if tier is not None:
-        return str(tier).strip().lower() == TIER1_CODE
+        return str(tier).strip().lower() in tuple(c.lower() for c in codes)
     return True

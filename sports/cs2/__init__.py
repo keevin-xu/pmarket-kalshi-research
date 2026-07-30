@@ -38,7 +38,7 @@ class Cs2Sport:
         only ever sees a venue title — this is True by design, so recording
         captures WIDE and the gates tier-filter offline. A live book missed is
         a live book gone."""
-        return pop.is_tier1(text, league)
+        return pop.is_tier1(text, league, self.params.census.tier1_leagues)
 
     def map_number(self, text: str) -> int | None:
         """CS2 says "Map N" where LoL says "Game N"."""
@@ -98,7 +98,8 @@ class Cs2Sport:
         oa = OutcomesAdapter()
         start = store.from_ts(self.params.census.window_start).strftime("%Y-%m-%dT%H:%M:%SZ")
         return oa.pull_window(window_start=start,
-                              tiers=(pop.TIER1_CODE,) + tuple(P.TIER_SECONDARY_ARM),
+                              tiers=tuple(self.params.census.tier1_leagues)
+                              + tuple(self.params.census.secondary_arm_tiers),
                               archive_dir=self.params.raw_dir)
 
     def load_map_results(self, paths: list[str]) -> list[dict]:

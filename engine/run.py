@@ -14,6 +14,9 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import copy
+from dataclasses import replace
+
 from core.config import CONFIG
 from core.census import coverage as cov
 from core.census import depth as depthmod
@@ -29,9 +32,11 @@ def _write_artifact(conn, sport, gate: str, payload: dict) -> str:
     out = Path(sport.params.artifacts_dir)
     out.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    payload.setdefault("arm", getattr(sport, "arm", "primary"))
     blob = json.dumps(payload, indent=2, sort_keys=True, default=str)
     h = hashlib.sha256(blob.encode()).hexdigest()
-    path = out / f"{gate}_{run_id}.json"
+    suffix = "" if payload["arm"] == "primary" else f"-ARM{payload['arm']}"
+    path = out / f"{gate}{suffix}_{run_id}.json"
     path.write_text(blob)
     conn.execute(
         "INSERT OR REPLACE INTO run_artifacts (run_id, gate, created_ts, path, table_hash) "
@@ -40,6 +45,26 @@ def _write_artifact(conn, sport, gate: str, payload: dict) -> str:
     )
     conn.commit()
     return str(path)
+
+
+def _secondary_arm(sport):
+    """The sport with its PRE-REGISTERED secondary population swapped in.
+
+    Declared in advance (`CensusParams.secondary_arm_tiers`) precisely so it
+    can never be reached for after a primary result is known. A shallow COPY
+    with overridden params — not a wrapper — because the sport's own methods
+    read `self.params`, so a delegating proxy would silently keep using the
+    primary population. Artifacts are written under a distinct name and the
+    arm never feeds the G4 verdict.
+    """
+    tiers = sport.params.census.secondary_arm_tiers
+    if not tiers:
+        raise SystemExit(f"{sport.key} declared no secondary arm")
+    armed = copy.copy(sport)
+    armed.params = replace(
+        sport.params, census=replace(sport.params.census, tier1_leagues=tiers))
+    armed.arm = "-".join(tiers)
+    return armed
 
 
 def _map_coverage(sport, oe_paths: list[str], cp) -> dict:
@@ -406,9 +431,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--db", default=None, help="override the sport's db path")
     ap.add_argument("--oe-glob", default=None, help="override neutral-source files")
     ap.add_argument("--no-live-depth", action="store_true", help="skip the live depth sweep")
+    ap.add_argument("--arm", choices=("primary", "secondary"), default="primary",
+                    help="which pre-registered population to run; 'secondary' is "
+                         "reported beside the primary and never replaces it")
     args = ap.parse_args(argv)
 
     sport = get_sport(args.sport)
+    if args.arm == "secondary":
+        sport = _secondary_arm(sport)
+        print(f"[secondary arm: tier {sport.arm}] results are reported BESIDE the "
+              f"primary population and never substitute for it.")
     conn = store.connect(args.db or sport.params.db_path)
 
     if args.gate == "G4":

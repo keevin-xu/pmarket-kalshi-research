@@ -56,6 +56,7 @@ CS2_PARAMS = SportParams(
         coverage_join_tolerance_min=90,
         team_match_threshold=0.85,
         tier1_leagues=("s",),                  # NEUTRAL tier codes, not names
+        secondary_arm_tiers=("a",),            # labelled arm; never the verdict
         # FROZEN at the G0 FREEZE (2026-07-30) to the OBSERVED Kalshi
         # market-retention floor: the earliest market row the 2026-07-30
         # backfill could retrieve was 2026-05-25T00:07Z. Kalshi drops

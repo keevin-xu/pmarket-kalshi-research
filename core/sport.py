@@ -54,7 +54,10 @@ class CensusParams:
     families_phase1: tuple[str, ...] = ()
     coverage_join_tolerance_min: int = 90
     team_match_threshold: float = 0.85
-    tier1_leagues: tuple[str, ...] = ()          # neutral-source league codes
+    tier1_leagues: tuple[str, ...] = ()          # neutral-source league/tier codes
+    # A pre-registered SECONDARY population, reported beside the primary in
+    # every gate and never substituted for it. Empty = the sport declared none.
+    secondary_arm_tiers: tuple[str, ...] = ()
     window_start: str = ""                       # ISO fixed-width UTC
 
 

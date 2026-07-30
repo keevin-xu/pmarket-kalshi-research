@@ -1,0 +1,47 @@
+{
+  "caveats": [
+    "series are Kalshi candle mid vs Polymarket prices-history last, as-of aligned (no lookahead / no fabricated fills).",
+    "if both venues reprice together the lead score ~0 with tight CI -> no tradeable lag despite a large instantaneous gap.",
+    "sample is the ~1-month history overlap; thin/CI-spanning results are resolved by recorder accrual, not a bar move."
+  ],
+  "family": "map_winner",
+  "frozen_rules": {
+    "ci_level": 0.95,
+    "confirmation_snapshots": 3,
+    "convergence_window_s": 300,
+    "divergence_threshold": 0.02,
+    "min_divergences": 30,
+    "sign": "positive lead score = Kalshi leads"
+  },
+  "gate": "G3",
+  "n_maps": 0,
+  "regimes": {
+    "in_game": {
+      "leader": null,
+      "n_divergences": 0,
+      "passed": null,
+      "regime": "in_game",
+      "signed_convergence": {
+        "ci_hi": null,
+        "ci_lo": null,
+        "n_blocks": 0,
+        "point": null
+      },
+      "verdict": "insufficient sample (n_divergences=0 < 30)"
+    },
+    "pre_match": {
+      "leader": null,
+      "n_divergences": 0,
+      "passed": null,
+      "regime": "pre_match",
+      "signed_convergence": {
+        "ci_hi": null,
+        "ci_lo": null,
+        "n_blocks": 0,
+        "point": null
+      },
+      "verdict": "insufficient sample (n_divergences=0 < 30)"
+    }
+  },
+  "sport": "cs2"
+}
