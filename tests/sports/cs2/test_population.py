@@ -55,7 +55,15 @@ def test_tier1_prefers_the_neutral_field_over_any_text():
     assert not pop.is_tier1("CS Asia Championships 2026", "a")
 
 
-def test_tier1_text_prefilter_when_no_neutral_tier():
-    assert pop.is_tier1("Counter-Strike: A vs B (BO3) - IEM Cologne Major")
-    assert not pop.is_tier1("Counter-Strike: A vs B (BO3) - CCT Europe Contenders #7")
-    assert not pop.is_tier1("Counter-Strike: A vs B (BO3) - BLAST Bounty Closed Qualifier")
+def test_unknown_tier_records_wide_rather_than_excluding():
+    """The live recorder only ever sees a venue title. A title that doesn't
+    reveal tier must NOT be dropped: a live book missed is gone for good,
+    while an over-captured one costs disk and is filtered offline later."""
+    assert pop.is_tier1("Counter-Strike: A vs B (BO3) - CCT Europe Contenders #7")
+    assert pop.is_tier1("Counter-Strike: A vs B (BO3) - some unknown event")
+
+
+def test_looks_tier1_is_a_title_hint_only():
+    assert pop.looks_tier1("Counter-Strike: A vs B (BO3) - IEM Cologne Major")
+    assert not pop.looks_tier1("Counter-Strike: A vs B (BO3) - CCT Europe Contenders #7")
+    assert not pop.looks_tier1("Counter-Strike: A vs B (BO3) - BLAST Bounty Closed Qualifier")

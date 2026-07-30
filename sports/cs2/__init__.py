@@ -32,7 +32,10 @@ class Cs2Sport:
 
     def is_tier1(self, text: str, league: str | None = None) -> bool:
         """`league` carries the NEUTRAL source's tier code ("s"/"a"/…) for CS2,
-        which is authoritative; text is only a venue-side pre-filter."""
+        which is authoritative. With no tier — i.e. the live recorder, which
+        only ever sees a venue title — this is True by design, so recording
+        captures WIDE and the gates tier-filter offline. A live book missed is
+        a live book gone."""
         return pop.is_tier1(text, league)
 
     def map_number(self, text: str) -> int | None:

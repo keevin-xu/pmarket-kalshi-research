@@ -91,18 +91,36 @@ def classify_family(text: str) -> str | None:
     return None
 
 
-def is_tier1(text: str, tier: str | None = None) -> bool:
-    """True iff this is a tier-1 (S-tier) fixture.
+def looks_tier1(text: str) -> bool:
+    """Does a VENUE TITLE look like an S-tier event? A hint, never a verdict.
 
-    `tier` is the NEUTRAL source's own field (bo3.gg `matches.tier`) and is
-    authoritative whenever present — recon measured it agreeing with
-    `tournaments.tier` on 1790/1790 rows in the window. The text branch is
-    only for venue-side titles, which carry a tournament name but no tier.
+    Exclusions are checked first, because bo3.gg itself tiers "BLAST Bounty …
+    Closed Qualifier" as a and "StarLadder … North American Qualifier" as c.
+    Nothing filters a population on this — see `is_tier1`.
     """
-    if tier is not None:
-        return str(tier).strip().lower() == TIER1_CODE
     cleaned = text or ""
     for ex in EXCLUSIONS:
         cleaned = re.sub(re.escape(ex), " ", cleaned, flags=re.IGNORECASE)
     return any(re.search(re.escape(name), cleaned, flags=re.IGNORECASE)
                for name in TIER1_NAMES)
+
+
+def is_tier1(text: str, tier: str | None = None) -> bool:
+    """True iff this fixture is tier-1, or iff tier CANNOT BE ESTABLISHED here.
+
+    `tier` is the NEUTRAL source's own field (bo3.gg `matches.tier`) and is
+    authoritative whenever present — recon measured it agreeing with
+    `tournaments.tier` on 1790/1790 rows in the window.
+
+    **Without it this returns True, which is deliberate.** The only caller
+    that has no tier is the live recorder, which sees a venue title and
+    nothing else. A CS2 venue title often names a tournament whose tier it
+    does not reveal, so excluding on the title would permanently drop tier-1
+    matches — and unlike bo3.gg, a live order book cannot be re-captured
+    later. Unknown tier therefore means "record it and let the gates filter
+    offline against the neutral join", which is the same capture-wide rule as
+    `load_all_matches`. Use `looks_tier1()` for the title hint itself.
+    """
+    if tier is not None:
+        return str(tier).strip().lower() == TIER1_CODE
+    return True
