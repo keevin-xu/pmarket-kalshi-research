@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from core.db import store
 from core.sport import SportParams
+from sports.cs2 import params as P
 from sports.cs2 import population as pop
 from sports.cs2.outcomes import OutcomesAdapter, archive_paths, checkpoint_status
 from sports.cs2.params import CS2_PARAMS
@@ -70,6 +71,30 @@ class Cs2Sport:
                 continue
             out.append(m)
         return out
+
+    def load_all_matches(self, paths: list[str]) -> list[dict]:
+        """Every archived fixture in the window, tier UNFILTERED.
+
+        Used only to target the history capture: pulling a market's series is
+        irreversible-if-skipped, so targeting must not be narrowed by a tier
+        ruling that a later gate might revisit.
+        """
+        oa = OutcomesAdapter()
+        win = store.from_ts(self.params.census.window_start)
+        return [m for m in oa.to_match_rows(self._merged(paths))
+                if store.from_ts(m["start_ts"]) >= win]
+
+    def backfill_neutral(self) -> str:
+        """Pull + archive the neutral window (tier s and the secondary a arm).
+
+        bo3.gg keeps full history, so this is the one source that CAN be
+        re-pulled; the venues cannot, which is why their capture is wide.
+        """
+        oa = OutcomesAdapter()
+        start = store.from_ts(self.params.census.window_start).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return oa.pull_window(window_start=start,
+                              tiers=(pop.TIER1_CODE,) + tuple(P.TIER_SECONDARY_ARM),
+                              archive_dir=self.params.raw_dir)
 
     def load_map_results(self, paths: list[str]) -> list[dict]:
         """Tier-1, in-window PLAYED maps: {teams, ts (map start), map_no,

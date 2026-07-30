@@ -193,16 +193,29 @@ class OutcomesAdapter(Adapter):
         return str(path)
 
     def _batched(self, resource: str, filter_key: str, ids: list, size: int = 40) -> list[dict]:
-        """Fetch rows by id in batches (the `[in]` filter is verified to bind)."""
+        """Fetch rows by id in batches, paginating WITHIN each batch.
+
+        `page[limit]` is capped server-side (observed: 100 returned for a
+        requested 200), and one match can have several maps, so a batch of ids
+        routinely exceeds one page. The completeness check below is what
+        caught that cap — a short page here would silently drop maps.
+        """
         out: list[dict] = []
         for i in range(0, len(ids), size):
             chunk = ",".join(str(x) for x in ids[i:i + size])
-            page = self._get(resource, {"page[limit]": 200, filter_key: chunk})
-            rows = page.get("results") or []
-            if rows and self._total(page) > len(rows):
-                raise VendorError(f"bo3 {resource}: id batch truncated "
-                                  f"({len(rows)} of {self._total(page)})")
-            out += rows
+            offset, total = 0, None
+            while True:
+                page = self._get(resource, {"page[limit]": P.BO3_PAGE_LIMIT,
+                                            "page[offset]": offset, filter_key: chunk})
+                rows = page.get("results") or []
+                total = self._total(page) if total is None else total
+                out += rows
+                offset += len(rows)
+                if not rows or offset >= total:
+                    break
+            if total and offset < total:
+                raise VendorError(f"bo3 {resource}: id batch incomplete "
+                                  f"({offset} of {total})")
         return out
 
     # --- normalization -------------------------------------------------------
@@ -270,9 +283,18 @@ class OutcomesAdapter(Adapter):
         the team row holds the short name ("LAG"), so this is a fuzzy match
         that must be UNAMBIGUOUS: matching both sides, or neither, returns
         None and the map is left without an outcome rather than guessed.
+
+        An EXACT normalized hit wins outright, because the shared fuzzy
+        matcher treats two single-token names sharing a first letter as the
+        same team (MOUZ/MIBR, BIG/B8) — without this, a map whose winner is
+        named exactly would be discarded as ambiguous.
         """
         if not clan_name:
             return None
+        exact = [n for n in names
+                 if n and cov.normalize_team(clan_name) == cov.normalize_team(n)]
+        if len(exact) == 1:
+            return exact[0]
         hits = [n for n in names if n and cov.team_match(clan_name, n)]
         return hits[0] if len(hits) == 1 else None
 

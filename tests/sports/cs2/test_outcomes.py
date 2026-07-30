@@ -88,6 +88,18 @@ def test_clan_name_resolves_to_the_team_name_or_stays_empty():
     assert OutcomesAdapter().to_map_results(snap)[0]["winner"] is None
 
 
+def test_exact_name_beats_the_fuzzy_matchers_first_letter_collision():
+    """core team_match() calls MOUZ and MIBR the same team (both acronyms are
+    "m"), so an exact normalized hit has to win or a named winner would be
+    thrown away as ambiguous."""
+    oa = OutcomesAdapter()
+    assert oa._resolve_side("MOUZ", ("MOUZ", "MIBR")) == "MOUZ"
+    assert oa._resolve_side("BIG", ("BIG", "B8")) == "BIG"
+    assert oa._resolve_side("Lifes A Game", ("Iowa Stormboar", "LAG")) == "LAG"
+    # a tag that matches BOTH sides stays unresolved rather than picking one
+    assert oa._resolve_side("M", ("MOUZ", "MIBR")) is None
+
+
 def test_duration_is_nanoseconds_and_implausible_rows_report_no_length():
     oa = OutcomesAdapter()
     assert oa.map_length_s(SNAPSHOT["games"][0]) == 2545     # 2.5e12 ns -> s

@@ -59,11 +59,31 @@ class RecorderConfig:
 
 
 @dataclass(frozen=True)
+class BackfillConfig:
+    # One-shot capture of vendor history into the local store. MECHANICS only
+    # (pacing, retries, how much series to keep around a map) — nothing here
+    # is a judged threshold.
+    # Neither venue publishes a rate-limit or Retry-After header, so pacing is
+    # self-imposed. Kalshi refused at ~7 req/s during recon and was clean at 1.
+    kalshi_min_interval_s: float = 0.35
+    polymarket_min_interval_s: float = 0.35
+    bo3_min_interval_s: float = 1.0
+    # A refusal (429/5xx/transport) is an outage, never "no data": back off,
+    # retry a bounded number of times, then FAIL the stage loudly.
+    max_refusal_retries: int = 4
+    refusal_backoff_s: float = 15.0
+    candle_period_min: int = 1               # Kalshi candles: 1-minute bars
+    preroll_s: int = 6 * 3600                # keep series from 6h before a map
+    postroll_s: int = 900                    # ...to 15 min after it ends
+
+
+@dataclass(frozen=True)
 class CoreConfig:
     regimes: Regimes = field(default_factory=Regimes)
     venues: Venues = field(default_factory=Venues)
     bootstrap: BootstrapConfig = field(default_factory=BootstrapConfig)
     recorder: RecorderConfig = field(default_factory=RecorderConfig)
+    backfill: BackfillConfig = field(default_factory=BackfillConfig)
 
     # Venue endpoints from env (no secrets baked in). Venue MECHANICS, global.
     polymarket_gamma: str = os.environ.get("POLYMARKET_GAMMA_BASE", "https://gamma-api.polymarket.com")
