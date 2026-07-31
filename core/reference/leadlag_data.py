@@ -44,6 +44,7 @@ def _kalshi_mid_series(candles: list[dict]) -> list[tuple[int, float]]:
 
 
 def build_map_series(sport, oe_paths: list[str], *, conn=None,
+                     family: str = "map_winner",
                      kalshi: KalshiAdapter | None = None,
                      poly: PolymarketAdapter | None = None) -> list[dict]:
     """Paired intraday series per covered map, read from the LOCAL STORE.
@@ -51,9 +52,9 @@ def build_map_series(sport, oe_paths: list[str], *, conn=None,
     if conn is None:
         raise ValueError("build_map_series reads the local store; pass a connection")
 
-    oe = sport.load_map_results(oe_paths)
-    krecs = _dedup(sweep.sweep_kalshi_map_results(sport))
-    precs = _dedup(sweep.sweep_polymarket_map_results(sport))
+    oe = sweep.neutral_results(sport, oe_paths, family)
+    k_raw, p_raw = sweep.venue_results(sport, family)
+    krecs, precs = _dedup(k_raw), _dedup(p_raw)
     kidx: dict[str, list[dict]] = {}
     pidx: dict[str, list[dict]] = {}
     for r in krecs:

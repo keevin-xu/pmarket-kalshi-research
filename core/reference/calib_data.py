@@ -71,16 +71,16 @@ def pm_series_for_team(conn, prec: dict, team_a: str) -> list[tuple[int, float]]
     return []
 
 
-def build_points(sport, oe_paths: list[str], *, conn=None,
+def build_points(sport, oe_paths: list[str], *, conn=None, family: str = "map_winner",
                  kalshi: KalshiAdapter | None = None,
                  poly: PolymarketAdapter | None = None) -> list[CalibrationPoint]:
     if conn is None:
         raise ValueError("build_points reads the local store; pass a connection")
     checkpoint_s = sport.params.reference.in_game_checkpoint_s
 
-    oe = sport.load_map_results(oe_paths)
-    krecs = _dedup(sweep.sweep_kalshi_map_results(sport))
-    precs = _dedup(sweep.sweep_polymarket_map_results(sport))
+    oe = sweep.neutral_results(sport, oe_paths, family)
+    k_raw, p_raw = sweep.venue_results(sport, family)
+    krecs, precs = _dedup(k_raw), _dedup(p_raw)
     kidx = {}
     pidx = {}
     for r in krecs:

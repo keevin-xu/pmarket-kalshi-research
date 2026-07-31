@@ -117,6 +117,47 @@ class Cs2Sport:
             out.append(r)
         return out
 
+    def load_match_results(self, paths: list[str]) -> list[dict]:
+        """Tier-1, in-window MATCHES as one record each (phase 2).
+
+        Anchored on **map 1's** `begin_at`, not the match's scheduled start:
+        the match contract's in-game checkpoint is defined inside map 1 (see
+        DECISION 2026-07-30 on the phase-2 checkpoint), and `gamelen_s` is
+        map 1's length so the checkpoint's validity test is about the map that
+        is actually being played at that instant. `map_no = 0` marks the whole
+        match, so match records never collide with map records.
+        """
+        oa = OutcomesAdapter()
+        merged = self._merged(paths)
+        win = store.from_ts(self.params.census.window_start)
+        first_map: dict[str, dict] = {}
+        for r in oa.to_map_results(merged):
+            mid = r["match_id"].rsplit(":m", 1)[0]
+            if r["map_no"] == 1 or mid not in first_map:
+                first_map.setdefault(mid, r)
+                if r["map_no"] == 1:
+                    first_map[mid] = r
+        out: list[dict] = []
+        for m in self.load_matches(paths):
+            if not m.get("result_winner"):
+                continue
+            g = first_map.get(m["match_id"])
+            ts = g["ts"] if g else m["start_ts"]
+            if store.from_ts(ts) < win:
+                continue
+            out.append({
+                "teams": (m["team_a"], m["team_b"]),
+                "ts": ts,
+                "map_no": 0,                      # 0 = the whole match
+                "winner": m["result_winner"],
+                "match_id": m["match_id"],
+                "gamelen_s": (g or {}).get("gamelen_s"),
+                "_tier": m["_tier"],
+                "_league": m["league"],
+                "_best_of": m["best_of"],
+            })
+        return out
+
     # --- neutral tier for an OPEN fixture (depth measurement) ----------------
     _schedule: list[dict] | None = None
 

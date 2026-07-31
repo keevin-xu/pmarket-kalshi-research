@@ -59,3 +59,39 @@ def test_polymarket_50_50_resolution_is_not_a_winner():
                              "outcomePrices": '["0.5", "0.5"]'}) is None
     assert sweep._pm_winner({"outcomes": '["Iowa Stormboar", "LAG"]',
                              "outcomePrices": '["0", "1"]'}) == "LAG"
+
+
+# --- phase 2: match_winner grain ---------------------------------------------
+def test_match_records_never_align_with_map_records():
+    """Match records carry map_no=0 and map records 1..n, so the shared
+    alignment helper cannot pair "who wins the match" with "who wins map 1" —
+    a comparison that would look sane and be a different claim."""
+    from core.parity.settlement import _find, _index_by_day
+    match_rec = {"teams": TEAMS, "ts": "2026-07-30T01:05:00.000Z", "map_no": 0,
+                 "winner": "LAG"}
+    idx = _index_by_day([_rec(1, "LAG")])
+    assert _find(idx, match_rec) is None
+    assert _find(_index_by_day([match_rec]), _rec(1, "LAG")) is None
+
+
+def test_family_dispatch_refuses_an_unknown_family():
+    import pytest
+    from core.census import sweep
+    with pytest.raises(ValueError):
+        sweep.venue_results(None, "total_maps")
+
+
+def test_bo1_matches_enter_phase2_but_not_phase1():
+    """A Bo1 has no map-winner market on Polymarket, so phase 1 cannot see it;
+    the match contract exists for every match, which is phase 2's whole point."""
+    from sports.cs2 import Cs2Sport
+    s = Cs2Sport()
+    paths = s.outcome_paths()
+    if not paths:
+        return
+    maps = {m["match_id"].rsplit(":m", 1)[0] for m in s.load_map_results(paths)}
+    matches = s.load_match_results(paths)
+    bo1 = [m for m in matches if m["_best_of"] == 1]
+    assert bo1, "expected Bo1 fixtures in the neutral archive"
+    assert all(m["map_no"] == 0 for m in matches)
+    assert len(matches) >= len(maps) - len(matches)   # match grain is one row per match

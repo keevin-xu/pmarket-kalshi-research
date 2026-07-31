@@ -317,3 +317,93 @@ def sweep_polymarket_live_depth(sport, conn, adapter: PolymarketAdapter | None =
                          "_last": m.get("lastTradePrice")})
             n += store.upsert_quotes(conn, adapter.to_quote_rows(book))
     return n
+
+
+# --- Per-MATCH settled results (phase 2: match_winner) -----------------------
+# Match records carry `map_no = 0` so the shared alignment helpers treat "the
+# whole match" as its own grain and can never pair a match contract with a map
+# contract.
+def sweep_kalshi_match_results(sport, adapter: KalshiAdapter | None = None) -> list[dict]:
+    adapter = adapter or KalshiAdapter()
+    win = _window_start(sport)
+    series_tickers = [t for t, f in sport.kalshi_series().items() if f == "match_winner"]
+    out: list[dict] = []
+    for series in series_tickers:
+        cursor = None
+        while True:
+            page = _kalshi_page(adapter, series, status="settled", cursor=cursor)
+            events = page.get("events", [])
+            if not events:
+                break
+            for ev in events:
+                mkts = ev.get("markets") or []
+                if len(mkts) < 2:
+                    continue
+                t = _iso_to_dt(mkts[0].get("close_time"))
+                if t is None or t < win:
+                    continue
+                teams = (mkts[0].get("yes_sub_title"), mkts[1].get("yes_sub_title"))
+                if not all(teams):
+                    continue
+                winner = next((m.get("yes_sub_title") for m in mkts
+                               if str(m.get("result", "")).strip() == "yes"), None)
+                out.append({"teams": teams, "ts": store.to_ts(t), "map_no": 0,
+                            "winner": winner, "contract_id": ev.get("event_ticker"),
+                            "series": series,
+                            "team_markets": {m.get("yes_sub_title"): m.get("ticker")
+                                             for m in mkts}})
+            cursor = page.get("cursor") or None
+            if not cursor:
+                break
+    return out
+
+
+def sweep_polymarket_match_results(sport, adapter: PolymarketAdapter | None = None) -> list[dict]:
+    adapter = adapter or PolymarketAdapter()
+    win = _window_start(sport)
+    out: list[dict] = []
+    for ev in adapter.iter_events(sport.polymarket_tag(), closed=True,
+                                  stop_before=sport.params.census.window_start):
+        pair = parse_pm_title(ev.get("title", ""))
+        if pair is None:
+            continue
+        t = pm_match_dt(ev)
+        if t is None or t < win:
+            continue
+        for m in ev.get("markets", []) or []:
+            text = f'{ev.get("title","")} — {m.get("question","")}'
+            if sport.is_prop(text) or sport.classify_family(text) != "match_winner":
+                continue
+            out.append({"teams": pair, "ts": store.to_ts(t), "map_no": 0,
+                        "winner": _pm_winner(m), "contract_id": m.get("conditionId"),
+                        "outcomes": _json_list(m.get("outcomes")),
+                        "tokens": _json_list(m.get("clobTokenIds"))})
+    return out
+
+
+# --- family dispatch (the gates never name a family inline) ------------------
+_RESULT_SWEEPS = {
+    "map_winner": (sweep_kalshi_map_results, sweep_polymarket_map_results),
+    "match_winner": (sweep_kalshi_match_results, sweep_polymarket_match_results),
+}
+
+
+def venue_results(sport, family: str):
+    """(kalshi_records, polymarket_records) for a family, at that family's own
+    grain. A family with no sweep is a hard error, never an empty list — an
+    empty result would read as "this family does not trade"."""
+    try:
+        k_fn, p_fn = _RESULT_SWEEPS[family]
+    except KeyError:
+        raise ValueError(f"no settled-result sweep for family {family!r}")
+    return k_fn(sport), p_fn(sport)
+
+
+def neutral_results(sport, paths: list[str], family: str) -> list[dict]:
+    """The sport's neutral records at a family's grain."""
+    if family == "match_winner":
+        fn = getattr(sport, "load_match_results", None)
+        if fn is None:
+            raise ValueError(f"{sport.key} has no match-grain neutral results")
+        return fn(paths)
+    return sport.load_map_results(paths)
