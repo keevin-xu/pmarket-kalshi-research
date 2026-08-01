@@ -93,20 +93,26 @@ def parse_kalshi_market(market: dict, orderbook_raw: dict | None, regime: str | 
     bsz = market.get("yes_bid_size_fp")
     asz = market.get("yes_ask_size_fp")
     two_sided = bid is not None and ask is not None
+    # Full ladder. Schema PINNED 2026-08-01 from a live CS2 book:
+    #   orderbook_fp = {"yes_dollars": [[price, size], ...],
+    #                   "no_dollars":  [[price, size], ...]}
+    # both STRING-valued and price-ascending. Kalshi expresses a book as two
+    # BID ladders, so the YES ask side must be derived: a NO bid at p is a YES
+    # ask at 1-p. Verified against the market object's own top-of-book fields
+    # (max yes = yes_bid 0.66; 1 - max no = yes_ask 0.70).
     yes: list[tuple[float, float]] = []
     no: list[tuple[float, float]] = []
     full_bid = full_ask = n_levels = None
-    if not CONFIG.recorder.kalshi_orderbook_verified:
-        ob = (orderbook_raw or {}).get("orderbook_fp") or {}
-        # defensive: only trust if it looks like {'yes':[[p,s]...], 'no':[...]}
-        try:
-            yes = [(float(p), float(s)) for p, s in (ob.get("yes") or [])]
-            no = [(float(p), float(s)) for p, s in (ob.get("no") or [])]
-            if yes or no:
-                full_bid, full_ask = _cumulative_usd(yes), _cumulative_usd(no)
-                n_levels = len(yes) + len(no)
-        except (TypeError, ValueError):
-            yes = no = []
+    ob = (orderbook_raw or {}).get("orderbook_fp") or {}
+    try:
+        yes = [(float(p), float(sz)) for p, sz in (ob.get("yes_dollars") or [])]
+        no = [(float(p), float(sz)) for p, sz in (ob.get("no_dollars") or [])]
+    except (TypeError, ValueError):
+        yes = no = []
+    if yes or no:
+        asks = [(round(1.0 - p, 6), sz) for p, sz in no]   # NO bids -> YES asks
+        full_bid, full_ask = _cumulative_usd(yes), _cumulative_usd(asks)
+        n_levels = len(yes) + len(asks)
     return {
         "contract_id": market.get("ticker"), "venue": CONFIG.venues.KALSHI, "ts": ts,
         "source": "live", "regime": regime, "fetch_latency_ms": latency_ms,

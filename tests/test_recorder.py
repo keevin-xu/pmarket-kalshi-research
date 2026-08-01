@@ -200,3 +200,30 @@ def test_resting_expires_so_a_market_that_gains_a_book_is_picked_up(conn, monkey
         rec._catalog = None
         rec.poll_cycle()
     assert poly.polled.count("tok1") >= 2     # retried after the cooldown, not dropped forever
+
+
+def test_kalshi_full_book_uses_the_real_schema_and_derives_the_ask_side():
+    """Schema pinned from a live CS2 book: two BID ladders, string-valued.
+    The parser previously looked for 'yes'/'no' keys that do not exist, so
+    every recorded row carried NULL full-book depth and an empty ladder."""
+    mkt = {"ticker": "KXCS2MAP-X-1-MAR", "yes_bid_dollars": 0.66,
+           "yes_ask_dollars": 0.70, "yes_bid_size_fp": 82, "yes_ask_size_fp": 198}
+    raw = {"orderbook_fp": {
+        "yes_dollars": [["0.6500", "100.00"], ["0.6600", "82.00"]],
+        "no_dollars": [["0.2900", "198.00"], ["0.3000", "123.00"]]}}
+    s = record.parse_kalshi_market(mkt, raw, "in_game", 9, "2026-08-01T00:00:00.000Z")
+    assert s["n_levels"] == 4                       # not None, and not zero
+    assert s["full_bid_usd"] == round(0.65 * 100 + 0.66 * 82, 2)
+    # NO bids at 0.29/0.30 are YES asks at 0.71/0.70
+    assert s["full_ask_usd"] == round(0.71 * 198 + 0.70 * 123, 2)
+    import json
+    lad = json.loads(s["raw_json"])
+    assert lad["yes"] and lad["no"]                 # the ladder is actually archived
+
+
+def test_unrecognised_book_stays_a_gap_not_a_zero():
+    mkt = {"ticker": "T", "yes_bid_dollars": 0.5, "yes_ask_dollars": 0.6,
+           "yes_bid_size_fp": 10, "yes_ask_size_fp": 10}
+    s = record.parse_kalshi_market(mkt, {"orderbook_fp": {}}, None, 1,
+                                   "2026-08-01T00:00:00.000Z")
+    assert s["full_bid_usd"] is None and s["n_levels"] is None

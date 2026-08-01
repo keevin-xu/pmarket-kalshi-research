@@ -54,8 +54,10 @@ class RecorderConfig:
     # budget, which is what forces the cap to bind in the first place. Kept
     # short so a market that gains a book near kickoff is picked up quickly.
     nobook_cooldown_cycles: int = 5
-    # Kalshi orderbook full-book parse UNVERIFIED until a live match pins it.
-    kalshi_orderbook_verified: bool = False
+    # Kalshi full-book schema VERIFIED 2026-08-01 against a live CS2 book
+    # (orderbook_fp.yes_dollars / no_dollars, string-valued, price-ascending;
+    # the ask side derived from NO bids). Kept as a record of that check.
+    kalshi_orderbook_verified: bool = True
     # Order-book archival: "compact" keeps the FULL ladder ([[price,size],...]
     # per side) minus vendor metadata (~1/2-1/3 the bytes; preserves the
     # price-impact curve over time); "full" keeps the verbose vendor JSON;
