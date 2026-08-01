@@ -609,3 +609,99 @@ events survive as shells: `/events?status=settled` still lists them, while
   sample can only come from the live recorder, which is what the [2026-07-22]
   G4 entry already required — this correction strengthens that requirement
   and removes any expectation that history could be re-pulled to widen n.
+
+## [2026-07-30] CORRECTION — the cross-venue team matcher had a FALSE-POSITIVE branch
+
+Raised from CS2, where it was caught corrupting a gate: CS2's G1 first
+reported 88.2% agreement, and the "disagreements" turned out to be unrelated
+fixtures joined together (a TYLOO vs SINNERS map "won" by Sharks). After the
+fix CS2's G1 read 100.0%. Append-only: the original LoL entries stand; this
+records a defect in a shared measurement path they depended on.
+
+**The defect.** `core/census/coverage.team_match` contained an
+`acronym(a) == acronym(b)` branch. A single-token team name has a ONE-LETTER
+acronym, so any two such names sharing a first letter were treated as the same
+team. `pair_match` then joined unrelated fixtures. The LoL ledger describes
+this matcher as conservative — "a miss only UNDERcounts coverage, never
+inflates it" ([2026-07-12]) — which is precisely backwards for this branch: it
+could only ever INFLATE.
+
+**Fixed 2026-07-30** by removing that branch. The derivable-abbreviation cases
+it was meant to serve go through the surviving rules and are now regression
+tested: HLE/Hanwha Life Esports, AL/Anyone's Legend, JDG/JD Gaming.
+
+**Measured exposure for LoL** (computed from `data/lol/db/pmk.db`, 3,992
+stored fixtures, 81 distinct team names — no vendor call needed):
+- **15 name pairs** the old matcher called identical and the fixed one does
+  not, all real LoL orgs: Cloud9/Conviction, Dignitas/Disguised, LOUD/LYON,
+  FURIA/Fnatic, FURIA/FlyQuest, FlyQuest/Fnatic, G2 Esports/GAM Esports,
+  LGD Gaming/Luminosity Gaming, Isurus Estral/Inferno Esports, and others.
+- **77 distinct fixture pairs** within ±1 day that the old matcher would have
+  joined to each other (e.g. 2025-04-20 `LOUD vs FURIA` <-> `Cloud9 vs
+  FlyQuest`; 2025-06-27 `FURIA vs G2 Esports` <-> `GAM Esports vs FURIA`).
+- **17 of 3,992 fixtures (0.43%)** are involved in at least one such pair.
+
+LoL is far less exposed than CS2 because its team names are mostly multi-word
+and its neutral source spells them consistently; CS2's population is full of
+short single-token names (MOUZ, MIBR, BIG, B8, G2) where the collision is
+routine.
+
+**What this means for the recorded LoL numbers.** The affected paths are G0
+coverage (`n_covered = 91`), G1 parity (223 aligned maps, 100% agreement),
+and the G2/G3 pairing (calibration n and 465 divergences). The exposure above
+is a bound on how often a wrong join was even POSSIBLE; it is not a count of
+wrong joins that occurred, because the real join is neutral-to-venue and only
+a subset of confusable fixtures had venue records on the same day. Note that
+G1's 100% agreement is evidence AGAINST widespread mis-joining in that
+sample: mis-joined maps disagree loudly, as CS2's 88.2% showed.
+
+**Why it is not simply re-measured.** LoL's gates re-fetch from the vendors,
+and Kalshi's market-level history now begins ~2026-05-24 (see the
+[2026-07-30] CORRECTION on rolling retention) — after the Oracle's Elixir
+coverage those runs used. A re-run today would measure a different, smaller
+population, not a corrected version of the same one.
+
+**Bounded remediation available**, for the operator to accept or decline: the
+0.43% of fixtures listed above can be checked by hand against
+`data/lol/db/pmk.db`, and the G2/G3 point sets re-derived from stored rows
+where they survive. No frozen threshold is affected either way, and no LoL
+verdict is retracted here — G4's blockers were depth, recorder corroboration
+and sample length, none of which depend on this matcher.
+
+## [2026-07-31] CORRECTION — G3's in-game lead may be a sampling artifact (not re-measurable)
+
+Raised from CS2, where the same measurement was run with controls. Append-only:
+the [2026-07-22] G3 entry and the G4 verdict stand as recorded; this states a
+confound that was not accounted for when they were computed.
+
+**The confound.** Kalshi serves 1-minute candles; Polymarket's
+`prices-history` returns ~10-minute points. A coarsely-sampled series is stale
+between observations, so while prices drift it appears to "follow" a finely
+sampled one **even when both venues hold identical information at every
+instant**. G3's signed-convergence measure cannot distinguish that from a real
+lead.
+
+**Measured on CS2, same venues, same asymmetry** (116 maps, Kalshi 60 s vs
+Polymarket 600 s): comparing Kalshi against a thinned copy of ITSELF — no
+information difference whatsoever — produced an in-game lead of **L = 0.0942,
+CI [0.0779, 0.1102]**, against a raw measured lead of **0.0941**. The artifact
+reproduced the finding exactly. With both series handicapped to the same
+cadence the estimate fell to 0.0200 with a CI spanning zero.
+
+**Why LoL cannot simply be re-checked.** `data/lol/db/pmk.db` holds 473 quote
+rows; G3 fetched its series from the vendors at run time, and both venues'
+history has since rolled off (Kalshi ~68 days, Polymarket ~30). The control
+needs those series and they no longer exist.
+
+**Status of the LoL finding.** Not retracted and not confirmed. Its in-game
+"LEADS: kalshi (CI excludes 0)" on 201 divergences was computed across an
+asymmetry now known to be capable of manufacturing a lead of that order in a
+comparable sample. The pre-match result ("no leader") is unaffected in
+direction, since an artifact pushes toward a false POSITIVE.
+
+**What would settle it.** The live recorder polls both venues on one 60-second
+cycle, so its series are cadence-matched by construction. Re-running G3 for
+LoL on recorder data at the 2026-09-30 bounded date would answer it properly.
+Until then the G4 CONDITIONAL should be read as resting on an unvalidated
+in-game lead, and `core/reference/cadence.py` should be run alongside any
+future lead-lag result for either sport.
