@@ -272,7 +272,7 @@ def run_g3(conn, sport, oe_paths: list[str], *, family: str = "map_winner",
            source: str = "hist") -> dict:
     """G3 lead-lag per regime, judged vs the sport's lead_lag params."""
     store.init_schema(conn)
-    from core.reference import lead_lag, leadlag_data
+    from core.reference import cadence, lead_lag, leadlag_data
     llp = sport.params.lead_lag
     maps = leadlag_data.build_map_series(sport, oe_paths, conn=conn, family=family,
                                         source=source)
@@ -281,6 +281,7 @@ def run_g3(conn, sport, oe_paths: list[str], *, family: str = "map_winner",
     regimes = {}
     for regime in (CONFIG.regimes.PRE_MATCH, CONFIG.regimes.IN_GAME):
         divs, convs, mids = [], [], []
+        sliced = []
         for mp in maps:
             lo, hi = ((mp["kickoff"] - preroll, mp["kickoff"])
                       if regime == CONFIG.regimes.PRE_MATCH
@@ -289,18 +290,34 @@ def run_g3(conn, sport, oe_paths: list[str], *, family: str = "map_winner",
             ks = leadlag_data.slice_series(mp["kalshi"], lo, hi)
             if len(ps) < 2 or len(ks) < 2:
                 continue
+            sliced.append({**mp, "poly": ps, "kalshi": ks})
             for d in lead_lag.detect_divergences(ps, ks, regime, match_id=mp["match_id"],
                                                  ll_params=llp):
                 convs.append(lead_lag.convergence_after(d, mp["poly"], mp["kalshi"], ll_params=llp))
                 divs.append(d)
                 mids.append(mp["match_id"])
         rep = lead_lag.lead_lag_report(divs, convs, mids, regime)
+
+        # Matched-cadence controls are part of the RESULT, not an optional
+        # follow-up: a raw lead measured across mismatched sampling reproduces
+        # itself when a venue is compared to a thinned copy of ITSELF, so a
+        # G3 artifact without these cannot be read at all.
+        rep["cadence"] = cadence.compare_cadence(sliced, regime, ll_params=llp)
+        ctrl = rep["cadence"]["artifact_control"]["signed_convergence"].get("point")
+        raw = rep["cadence"]["raw"]["signed_convergence"].get("point")
+        rep["artifact_dominated"] = bool(
+            ctrl is not None and raw not in (None, 0) and abs(ctrl) >= abs(raw) * 0.5)
+
         n = rep["n_divergences"]
         if n < llp.min_divergences:
             rep["verdict"] = f"insufficient sample (n_divergences={n} < {llp.min_divergences})"
             rep["passed"] = None
+        elif rep["leader"] and rep["artifact_dominated"]:
+            rep["verdict"] = (f"NO FINDING — raw lead {rep['leader']} is reproduced by the "
+                              f"cadence artifact control; not evidence of information flow")
+            rep["passed"] = False
         elif rep["leader"]:
-            rep["verdict"] = f"LEADS: {rep['leader']} (CI excludes 0)"
+            rep["verdict"] = f"LEADS: {rep['leader']} (CI excludes 0, survives matched cadence)"
             rep["passed"] = True
         else:
             rep["verdict"] = "no leader — CI spans 0; no tradeable cross-venue lag"
@@ -318,6 +335,8 @@ def run_g3(conn, sport, oe_paths: list[str], *, family: str = "map_winner",
                          "provenance": source},
         "n_maps": len(maps), "regimes": regimes,
         "caveats": [
+            "a raw lead on mismatched cadence is not evidence of information "
+            "flow; read `cadence.artifact_control` before `raw`.",
             "series are Kalshi candle mid vs Polymarket prices-history last, "
             "as-of aligned (no lookahead / no fabricated fills).",
             "if both venues reprice together the lead score ~0 with tight CI -> "
@@ -430,6 +449,16 @@ def _print_g3(p: dict) -> None:
         print(f"\n[{regime}]  n_divergences={rep['n_divergences']}")
         print(f"  mean lead L={_fmt(b.get('point'))}  CI[{_fmt(b.get('ci_lo'))}, {_fmt(b.get('ci_hi'))}]  "
               f"n_blocks={b.get('n_blocks')}")
+        cad = rep.get("cadence") or {}
+        if cad:
+            cs = cad.get("cadence_s", {})
+            print(f"  cadence: kalshi={cs.get('kalshi_median')}s "
+                  f"polymarket={cs.get('polymarket_median')}s")
+            for arm in ("raw", "matched", "artifact_control"):
+                a = cad.get(arm, {}).get("signed_convergence", {})
+                print(f"    {arm:18} L={_fmt(a.get('point'))} "
+                      f"CI[{_fmt(a.get('ci_lo'))}, {_fmt(a.get('ci_hi'))}] "
+                      f"n_div={cad.get(arm, {}).get('n_divergences')}")
         print(f"  VERDICT: {rep['verdict']}  -> passed={rep['passed']}")
     print(f"\nartifact: {p['artifact_path']}")
     print("STOP — G3 is a human-review gate.")

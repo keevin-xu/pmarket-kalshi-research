@@ -1,0 +1,132 @@
+{
+  "arm": "a",
+  "caveats": [
+    "a raw lead on mismatched cadence is not evidence of information flow; read `cadence.artifact_control` before `raw`.",
+    "series are Kalshi candle mid vs Polymarket prices-history last, as-of aligned (no lookahead / no fabricated fills).",
+    "if both venues reprice together the lead score ~0 with tight CI -> no tradeable lag despite a large instantaneous gap.",
+    "sample is the ~1-month history overlap; thin/CI-spanning results are resolved by recorder accrual, not a bar move."
+  ],
+  "family": "map_winner",
+  "frozen_rules": {
+    "ci_level": 0.95,
+    "confirmation_snapshots": 3,
+    "convergence_window_s": 300,
+    "divergence_threshold": 0.02,
+    "min_divergences": 30,
+    "provenance": "hist",
+    "sign": "positive lead score = Kalshi leads"
+  },
+  "gate": "G3",
+  "n_maps": 116,
+  "regimes": {
+    "in_game": {
+      "artifact_dominated": true,
+      "cadence": {
+        "artifact_control": {
+          "leader": "kalshi",
+          "n_divergences": 565,
+          "regime": "in_game",
+          "signed_convergence": {
+            "ci_hi": 0.11018739352640544,
+            "ci_lo": 0.07788135593220338,
+            "n_blocks": 115,
+            "point": 0.09415929203539822
+          }
+        },
+        "cadence_s": {
+          "kalshi_median": 60.0,
+          "polymarket_median": 600.0
+        },
+        "matched": {
+          "leader": null,
+          "n_divergences": 49,
+          "regime": "in_game",
+          "signed_convergence": {
+            "ci_hi": 0.05068627450980392,
+            "ci_lo": -0.009642857142857144,
+            "n_blocks": 41,
+            "point": 0.02001020408163265
+          }
+        },
+        "raw": {
+          "leader": "kalshi",
+          "n_divergences": 634,
+          "regime": "in_game",
+          "signed_convergence": {
+            "ci_hi": 0.1084394856278366,
+            "ci_lo": 0.07971809369951535,
+            "n_blocks": 115,
+            "point": 0.09412618296529969
+          }
+        },
+        "reading": "cadence artifact accounts for a large share of the raw lead \u2014 the raw number is not evidence of information flow"
+      },
+      "leader": "kalshi",
+      "n_divergences": 634,
+      "passed": false,
+      "regime": "in_game",
+      "signed_convergence": {
+        "ci_hi": 0.1095365671641791,
+        "ci_lo": 0.08096072013093289,
+        "n_blocks": 115,
+        "point": 0.09515851735015773
+      },
+      "verdict": "NO FINDING \u2014 raw lead kalshi is reproduced by the cadence artifact control; not evidence of information flow"
+    },
+    "pre_match": {
+      "artifact_dominated": true,
+      "cadence": {
+        "artifact_control": {
+          "leader": "kalshi",
+          "n_divergences": 155,
+          "regime": "pre_match",
+          "signed_convergence": {
+            "ci_hi": 0.03524647887323944,
+            "ci_lo": 0.013165467625899286,
+            "n_blocks": 74,
+            "point": 0.024161290322580645
+          }
+        },
+        "cadence_s": {
+          "kalshi_median": 60.0,
+          "polymarket_median": 600.0
+        },
+        "matched": {
+          "leader": null,
+          "n_divergences": 248,
+          "regime": "pre_match",
+          "signed_convergence": {
+            "ci_hi": 0.0016736401673640195,
+            "ci_lo": -0.0021481481481481477,
+            "n_blocks": 66,
+            "point": -8.064516129032109e-05
+          }
+        },
+        "raw": {
+          "leader": null,
+          "n_divergences": 612,
+          "regime": "pre_match",
+          "signed_convergence": {
+            "ci_hi": 0.005175131348511383,
+            "ci_lo": -0.0009424920127795523,
+            "n_blocks": 105,
+            "point": 0.0020424836601307195
+          }
+        },
+        "reading": "cadence artifact accounts for a large share of the raw lead \u2014 the raw number is not evidence of information flow"
+      },
+      "leader": null,
+      "n_divergences": 612,
+      "passed": false,
+      "regime": "pre_match",
+      "signed_convergence": {
+        "ci_hi": 0.00670556552962298,
+        "ci_lo": -0.0002752293577981652,
+        "n_blocks": 105,
+        "point": 0.0030392156862745104
+      },
+      "verdict": "no leader \u2014 CI spans 0; no tradeable cross-venue lag"
+    }
+  },
+  "sport": "cs2"
+}
