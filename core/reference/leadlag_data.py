@@ -44,7 +44,7 @@ def _kalshi_mid_series(candles: list[dict]) -> list[tuple[int, float]]:
 
 
 def build_map_series(sport, oe_paths: list[str], *, conn=None,
-                     family: str = "map_winner",
+                     family: str = "map_winner", source: str = "hist",
                      kalshi: KalshiAdapter | None = None,
                      poly: PolymarketAdapter | None = None) -> list[dict]:
     """Paired intraday series per covered map, read from the LOCAL STORE.
@@ -80,8 +80,11 @@ def build_map_series(sport, oe_paths: list[str], *, conn=None,
             continue
 
         lo, hi = kickoff - _PREROLL_S, map_end + 300
-        k_series = store.price_series(conn, k_ticker, field="mid", lo=lo, hi=hi)
-        p_series = [(t, p) for t, p in calib_data.pm_series_for_team(conn, prec, team_a)
+        k_series = store.price_series(
+            conn, k_ticker, field=calib_data.price_field(CONFIG.venues.KALSHI, source),
+            source=source, lo=lo, hi=hi)
+        p_series = [(t, p) for t, p in
+                    calib_data.pm_series_for_team(conn, prec, team_a, source)
                     if lo <= t <= hi]
         if len(k_series) < 2 or len(p_series) < 2:
             continue

@@ -62,3 +62,40 @@ def test_polymarket_series_is_inverted_when_team_a_is_the_second_outcome(conn, u
     assert pm_series_for_team(conn, prec, "Alpha")[0][1] == 0.30
     assert pm_series_for_team(conn, prec, "Beta")[0][1] == 0.70
     assert pm_series_for_team(conn, prec, "Gamma") == []      # unknown side -> no series
+
+
+# --- provenance: recorder rows vs vendor history -----------------------------
+def test_live_series_come_from_the_recorder_table(conn, utc):
+    """The recorder writes book_snapshots, the backfill writes quotes. A gate
+    asking for 'live' must read the recorder's rows, not silently fall back to
+    vendor history captured at a different cadence."""
+    from core.db import store
+    store.upsert_contracts(conn, [{"contract_id": "K1", "venue": "kalshi",
+                                   "family": "map_winner", "outcome_side": "A"}])
+    store.upsert_quotes(conn, [
+        {"contract_id": "K1", "venue": "kalshi", "ts": store.to_ts(utc(2026, 7, 1, 12, 0)),
+         "source": "hist", "mid": 0.40}])
+    store.upsert_book_snapshots_with_cursor(conn, [
+        {"contract_id": "K1", "venue": "kalshi", "ts": store.to_ts(utc(2026, 7, 1, 12, 1)),
+         "source": "live", "mid": 0.61, "book_ok": 1}], stream="s", cursor_value="c")
+
+    assert [p for _, p in store.price_series(conn, "K1", source="hist")] == [0.40]
+    assert [p for _, p in store.price_series(conn, "K1", source="live")] == [0.61]
+
+
+def test_provenance_is_explicit_and_fields_are_table_checked(conn):
+    import pytest
+    from core.db import store
+    with pytest.raises(ValueError):
+        store.price_series(conn, "K1", source="both")        # mixing is never implicit
+    with pytest.raises(ValueError):
+        store.price_series(conn, "K1", field="last", source="live")   # no such column
+
+
+def test_polymarket_price_basis_differs_by_provenance():
+    """`prices-history` is a traded series; the recorder captures the book. The
+    two are different quantities, which is why they are never concatenated."""
+    from core.reference.calib_data import price_field
+    assert price_field("polymarket", "hist") == "last"
+    assert price_field("polymarket", "live") == "mid"
+    assert price_field("kalshi", "hist") == price_field("kalshi", "live") == "mid"

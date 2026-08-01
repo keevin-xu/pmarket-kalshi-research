@@ -241,6 +241,16 @@ def record_discard(
     conn.commit()
 
 
+# Which table holds which provenance. `hist` is vendor history pulled by the
+# backfill; `live` is the recorder's own book snapshots. They are NEVER mixed
+# by default — the two carry different cadences and, on Polymarket, different
+# price bases, so silently concatenating them would fabricate a regime change
+# in the middle of a series.
+_SERIES_TABLE = {"hist": "quotes", "live": "book_snapshots"}
+_SERIES_FIELDS = {"quotes": ("mid", "last", "bid", "ask"),
+                  "book_snapshots": ("mid", "best_bid", "best_ask")}
+
+
 def price_series(conn, contract_id: str, *, field: str = "mid", source: str = "hist",
                  lo: int | None = None, hi: int | None = None) -> list[tuple[int, float]]:
     """A contract's stored price series as [(unix_ts, price)], time-ordered.
@@ -250,13 +260,21 @@ def price_series(conn, contract_id: str, *, field: str = "mid", source: str = "h
     gate silently see less than the run before it; the local store is the
     system of record and this is how it is read.
 
+    `source` selects provenance explicitly — 'hist' (vendor history) or 'live'
+    (recorder snapshots). The recorder polls both venues on ONE cycle, so live
+    series are cadence-matched by construction and are the only ones on which
+    a lead-lag result is not confounded by sampling frequency.
+
     `field` is the venue's pre-registered reference price — 'mid' for an order
     book (NEVER de-vigged), 'last' for a traded series. Rows whose field is
     NULL are skipped: a gap stays a gap.
     """
-    if field not in ("mid", "last", "bid", "ask"):
-        raise ValueError(f"refusing to read unknown price field {field!r}")
-    sql = (f"SELECT ts, {field} AS p FROM quotes "
+    table = _SERIES_TABLE.get(source)
+    if table is None:
+        raise ValueError(f"unknown provenance {source!r}; mixing is never implicit")
+    if field not in _SERIES_FIELDS[table]:
+        raise ValueError(f"refusing to read field {field!r} from {table}")
+    sql = (f"SELECT ts, {field} AS p FROM {table} "
            "WHERE contract_id = ? AND source = ? AND " + field + " IS NOT NULL")
     params: list = [contract_id, source]
     if lo is not None:

@@ -52,7 +52,22 @@ def _side_key(names, team_a: str):
     return None
 
 
-def pm_series_for_team(conn, prec: dict, team_a: str) -> list[tuple[int, float]]:
+def price_field(venue: str, source: str) -> str:
+    """The pre-registered reference price for a (venue, provenance).
+
+    Kalshi is an order book in both provenances -> mid, never de-vigged.
+    Polymarket's VENDOR HISTORY is a traded-price series (`last`) because that
+    is all `prices-history` returns; the RECORDER captures its book, so live
+    Polymarket is a mid. The two are different quantities, which is exactly
+    why provenance is never mixed inside one series.
+    """
+    if venue == CONFIG.venues.KALSHI:
+        return "mid"
+    return "last" if source == "hist" else "mid"
+
+
+def pm_series_for_team(conn, prec: dict, team_a: str,
+                       source: str = "hist") -> list[tuple[int, float]]:
     """Polymarket series as P(team_a wins), from the store.
 
     The backfill stores ONE series per market — the probability of
@@ -61,7 +76,9 @@ def pm_series_for_team(conn, prec: dict, team_a: str) -> list[tuple[int, float]]
     would silently score every such map against the wrong side.
     """
     outs = prec.get("outcomes") or []
-    raw = store.price_series(conn, prec.get("contract_id"), field="last")
+    raw = store.price_series(conn, prec.get("contract_id"),
+                             field=price_field(CONFIG.venues.POLYMARKET, source),
+                             source=source)
     if not raw or not outs:
         return []
     if cov.team_match(team_a, outs[0]):
@@ -72,6 +89,7 @@ def pm_series_for_team(conn, prec: dict, team_a: str) -> list[tuple[int, float]]
 
 
 def build_points(sport, oe_paths: list[str], *, conn=None, family: str = "map_winner",
+                 source: str = "hist",
                  kalshi: KalshiAdapter | None = None,
                  poly: PolymarketAdapter | None = None) -> list[CalibrationPoint]:
     if conn is None:
@@ -105,7 +123,9 @@ def build_points(sport, oe_paths: list[str], *, conn=None, family: str = "map_wi
         k_ticker = next((tk for team, tk in (krec.get("team_markets") or {}).items()
                          if team and cov.team_match(team_a, team)), None)
         if k_ticker:
-            k_series = store.price_series(conn, k_ticker, field="mid")
+            k_series = store.price_series(
+                conn, k_ticker, field=price_field(CONFIG.venues.KALSHI, source),
+                source=source)
             for regime, tgt in targets.items():
                 mid = store.price_at(k_series, tgt)
                 if mid is not None:
@@ -113,7 +133,7 @@ def build_points(sport, oe_paths: list[str], *, conn=None, family: str = "map_wi
                                                    regime, mid, outcome))
 
         # --- Polymarket: stored LAST series, oriented to team_a ---------------
-        p_series = pm_series_for_team(conn, prec, team_a)
+        p_series = pm_series_for_team(conn, prec, team_a, source)
         for regime, tgt in targets.items():
             pr = store.price_at(p_series, tgt)
             if pr is not None:

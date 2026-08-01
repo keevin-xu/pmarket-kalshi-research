@@ -225,11 +225,13 @@ def run_g1(conn, sport, oe_paths: list[str], *, family: str = "map_winner") -> d
     return payload
 
 
-def run_g2(conn, sport, oe_paths: list[str], *, family: str = "map_winner") -> dict:
+def run_g2(conn, sport, oe_paths: list[str], *, family: str = "map_winner",
+           source: str = "hist") -> dict:
     """G2 calibration per regime, judged vs the sport's reference params."""
     store.init_schema(conn)
     from core.reference import calib_data, calibration
-    points = calib_data.build_points(sport, oe_paths, conn=conn, family=family)
+    points = calib_data.build_points(sport, oe_paths, conn=conn, family=family,
+                                     source=source)
     min_n = 50
     regimes = {}
     for regime in (CONFIG.regimes.PRE_MATCH, CONFIG.regimes.IN_GAME):
@@ -250,7 +252,11 @@ def run_g2(conn, sport, oe_paths: list[str], *, family: str = "map_winner") -> d
         "frozen_rules": {"metric": "ECE",
                          "pass_margin": sport.params.reference.calibration_pass_margin,
                          "min_sample": min_n,
-                         "in_game_checkpoint_s": sport.params.reference.in_game_checkpoint_s},
+                         "in_game_checkpoint_s": sport.params.reference.in_game_checkpoint_s,
+                         "provenance": source,
+                         "price_basis": {
+                             CONFIG.venues.KALSHI: calib_data.price_field(CONFIG.venues.KALSHI, source),
+                             CONFIG.venues.POLYMARKET: calib_data.price_field(CONFIG.venues.POLYMARKET, source)}},
         "n_points_total": len(points), "regimes": regimes,
         "caveats": [
             "one point per map (Blue-side team); outcome from the neutral source.",
@@ -262,12 +268,14 @@ def run_g2(conn, sport, oe_paths: list[str], *, family: str = "map_winner") -> d
     return payload
 
 
-def run_g3(conn, sport, oe_paths: list[str], *, family: str = "map_winner") -> dict:
+def run_g3(conn, sport, oe_paths: list[str], *, family: str = "map_winner",
+           source: str = "hist") -> dict:
     """G3 lead-lag per regime, judged vs the sport's lead_lag params."""
     store.init_schema(conn)
     from core.reference import lead_lag, leadlag_data
     llp = sport.params.lead_lag
-    maps = leadlag_data.build_map_series(sport, oe_paths, conn=conn, family=family)
+    maps = leadlag_data.build_map_series(sport, oe_paths, conn=conn, family=family,
+                                        source=source)
     preroll = leadlag_data._PREROLL_S
 
     regimes = {}
@@ -306,7 +314,8 @@ def run_g3(conn, sport, oe_paths: list[str], *, family: str = "map_winner") -> d
                          "convergence_window_s": llp.convergence_window_s,
                          "ci_level": CONFIG.bootstrap.ci_level,
                          "min_divergences": llp.min_divergences,
-                         "sign": "positive lead score = Kalshi leads"},
+                         "sign": "positive lead score = Kalshi leads",
+                         "provenance": source},
         "n_maps": len(maps), "regimes": regimes,
         "caveats": [
             "series are Kalshi candle mid vs Polymarket prices-history last, "
@@ -433,6 +442,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--db", default=None, help="override the sport's db path")
     ap.add_argument("--oe-glob", default=None, help="override neutral-source files")
     ap.add_argument("--no-live-depth", action="store_true", help="skip the live depth sweep")
+    ap.add_argument("--source", choices=("hist", "live"), default="hist",
+                    help="provenance: 'hist' = vendor history (cadence-mismatched); "
+                         "'live' = recorder snapshots, cadence-matched by construction")
     ap.add_argument("--family", default="map_winner",
                     help="market family to gate (phase 1 = map_winner; "
                          "match_winner is the pre-registered phase 2)")
@@ -465,9 +477,9 @@ def main(argv: list[str] | None = None) -> int:
     elif args.gate == "G1":
         _print_g1(run_g1(conn, sport, paths, family=args.family))
     elif args.gate == "G2":
-        _print_g2(run_g2(conn, sport, paths, family=args.family))
+        _print_g2(run_g2(conn, sport, paths, family=args.family, source=args.source))
     elif args.gate == "G3":
-        _print_g3(run_g3(conn, sport, paths, family=args.family))
+        _print_g3(run_g3(conn, sport, paths, family=args.family, source=args.source))
     return 0
 
 
