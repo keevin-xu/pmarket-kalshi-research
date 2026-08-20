@@ -16,6 +16,9 @@ data/*/db/*
 !data/*/db/.gitkeep
 data/*/raw/*
 !data/*/raw/.gitkeep
+# Pulled-down server backups: multi-GB SQLite copies, never versioned.
+data/*/backups/*
+!data/*/backups/.gitkeep
 
 # Run artifacts ARE versioned on purpose: every number in a report must
 # trace to a stored artifact, so the evidence trail belongs in git.
