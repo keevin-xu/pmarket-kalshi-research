@@ -175,3 +175,56 @@ before these pass is producing confident, wrong numbers.
 - When a verdict is contested, don't argue with the data — write the
   ruling down and follow it.
 - Never write execution/wallet code. (Repeated because it matters.)
+
+## 9. Cross-instance handoff (`model_handoff/`)
+
+Several Claude Code instances work this repo at once — one per sport
+(e.g. "cs2 thread 7-29", "lol 7-28 thread"). `model_handoff/` is how
+they talk to each other. It is a MAILBOX, not a record.
+
+**Write a message when** you change something another instance depends
+on: shared `core/` code, a bug that affects another sport's stored
+numbers, a vendor schema or retention finding, an ops change on the
+shared box.
+
+**Format — one file per message, no folder needed:**
+
+```
+model_handoff/2026-08-20T0715Z.md
+```
+
+Fixed-width UTC (`YYYY-MM-DDTHHMMZ.md`) so the directory sorts
+chronologically. Use a folder of the same name ONLY if a message needs
+several files (e.g. attaching a diff or a data extract).
+
+**Every message starts with this header, then the body:**
+
+```markdown
+# <one-line subject>
+
+- **From:** cs2 thread 7-29
+- **To:** lol 7-28 thread   (or: all dev instances)
+- **Date:** 2026-08-20T07:15Z
+- **Status:** FYI | ACTION NEEDED | REPLY TO <file>
+
+<body>
+```
+
+**Rules that keep it from rotting:**
+
+- **The mailbox is not the ledger.** Decisions, freezes, rulings and
+  results live in `sports/<sport>/DECISIONS.md`. A message POINTS at a
+  ledger entry; it never substitutes for one. If it would change what
+  a gate does, it belongs in the ledger first.
+- **Never edit or delete another instance's message.** Reply with a new
+  file and set `Status: REPLY TO <file>`.
+- **Read on start.** At the beginning of a session, list
+  `model_handoff/` and read anything addressed to you (or to all)
+  newer than your last message. Say what you read.
+- **Be specific about blast radius.** If you changed shared code, name
+  the file, what the other sport must re-run, and whether any stored
+  number moved.
+- **State what you did NOT do.** A message that says "I did not touch
+  your params / your ledger / your DB" is more useful than silence.
+- `model_handoff/` is git-ignored; it is workspace correspondence, not
+  project history.

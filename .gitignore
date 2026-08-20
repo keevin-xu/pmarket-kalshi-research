@@ -35,3 +35,4 @@ data/*/backups/*
 *.md
 !README.md
 model_handoff/
+CLAUDE.md
