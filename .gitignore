@@ -34,3 +34,4 @@ data/*/backups/*
 # for any doc that should be reviewable.
 *.md
 !README.md
+model_handoff/
