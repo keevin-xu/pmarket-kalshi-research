@@ -289,6 +289,47 @@ class Backfill:
         return {"events": n_events, "contracts": n_contracts, "quote_rows": n_rows,
                 "already_captured": skipped, "history_targets": len(targets)}
 
+    # --- stage: contract metadata recovery -----------------------------------
+    def contracts(self) -> dict:
+        """Recover `contracts` rows for markets already recorded but never
+        described — and do it BEFORE the venues stop serving them.
+
+        The recorder used to store `book_snapshots` without the contract row,
+        leaving an opaque id. Both venues still list a settled market for a
+        while (Kalshi ~68 days), so the mapping is recoverable now and not
+        later. Prices are untouched; this writes metadata only.
+        """
+        n = 0
+        for family in ("map_winner", "match_winner"):
+            k_recs, p_recs = [], []
+            try:
+                k_recs, p_recs = sweep.venue_results(self.sport, family)
+            except Exception as e:                       # a family may not exist
+                log.warning("metadata sweep failed for %s: %r", family, e)
+                continue
+            rows = []
+            for r in k_recs:
+                for team, ticker in (r.get("team_markets") or {}).items():
+                    if ticker:
+                        rows.append({"contract_id": ticker, "venue": CONFIG.venues.KALSHI,
+                                     "match_id": None, "family": family,
+                                     "outcome_side": team or "",
+                                     "question_text": " vs ".join(r["teams"]),
+                                     "parity_ok": None})
+            for r in p_recs:
+                if r.get("contract_id"):
+                    outs = r.get("outcomes") or []
+                    rows.append({"contract_id": r["contract_id"],
+                                 "venue": CONFIG.venues.POLYMARKET, "match_id": None,
+                                 "family": family,
+                                 "outcome_side": (outs[0] if outs else ""),
+                                 "question_text": " vs ".join(r["teams"]),
+                                 "parity_ok": None})
+            if rows and not self.dry_run:
+                n += store.upsert_contracts(self.conn, rows)
+            log.info("metadata: %s -> %d contract rows", family, len(rows))
+        return {"contract_rows": n}
+
     # --- driver --------------------------------------------------------------
     def run(self, *, stages=STAGES, scope: str = "neutral",
             limit: int | None = None) -> dict:
@@ -296,6 +337,8 @@ class Backfill:
         summary: dict = {"sport": self.sport.key, "scope": scope,
                          "window_start": self.sport.params.census.window_start,
                          "started_at": store.to_ts(datetime.now(timezone.utc))}
+        if "contracts" in stages:
+            summary["contracts"] = self.contracts()
         if "neutral" in stages:
             summary["neutral"] = self.neutral()
         if "kalshi" in stages:

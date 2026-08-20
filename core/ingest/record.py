@@ -164,14 +164,16 @@ class Recorder:
             try:
                 for ev in self.poly.iter_events(sport.polymarket_tag(), closed=False):
                     title = ev.get("title", "")
-                    if sweep.parse_pm_title(title) is None:
+                    pair = sweep.parse_pm_title(title)
+                    if pair is None:
                         continue
                     if CONFIG.recorder.tier1_only and not sport.is_tier1(title):
                         continue
                     kickoff = sweep.pm_match_dt(ev)
                     for m in ev.get("markets", []) or []:
                         text = f'{title} — {m.get("question","")}'
-                        if sport.is_prop(text) or sport.classify_family(text) not in families:
+                        fam = sport.classify_family(text)
+                        if sport.is_prop(text) or fam not in families:
                             continue
                         toks = m.get("clobTokenIds")
                         if isinstance(toks, str):
@@ -183,7 +185,12 @@ class Recorder:
                         if cid and toks:
                             cat["polymarket"].append(
                                 {"contract_id": cid, "token": toks[0],
-                                 "kickoff": int(kickoff.timestamp()) if kickoff else None})
+                                 "kickoff": int(kickoff.timestamp()) if kickoff else None,
+                                 "contract_row": {
+                                     "contract_id": cid, "venue": self.poly.venue,
+                                     "match_id": None, "family": fam,
+                                     "outcome_side": f"{pair[0]} vs {pair[1]}",
+                                     "question_text": text, "parity_ok": None}})
             except VendorError as e:
                 self._trip("polymarket", e)
         # Kalshi open phase-1 markets for THIS sport
@@ -198,9 +205,24 @@ class Recorder:
                             k = m.get("close_time")
                             cat["kalshi"].append(
                                 {"ticker": m.get("ticker"), "market": m,
-                                 "kickoff": None})   # kickoff via OE join later
+                                 "kickoff": None,   # kickoff via neutral join later
+                                 "contract_row": {
+                                     "contract_id": m.get("ticker"),
+                                     "venue": self.kalshi.venue, "match_id": None,
+                                     "family": sport.kalshi_series().get(series, ""),
+                                     "outcome_side": m.get("yes_sub_title") or "",
+                                     "question_text": ev.get("title") or "",
+                                     "parity_ok": None}})
             except VendorError as e:
                 self._trip("kalshi", e)
+        # Persist WHAT is being recorded, not just its prices. Without this a
+        # book_snapshot is an opaque id: the venue stops serving the market
+        # after settlement (Kalshi drops it at ~68 days), and the rows become
+        # permanently unmappable to teams, family or tier.
+        meta = [f["contract_row"] for side in cat.values() for f in side
+                if f.get("contract_row")]
+        if meta:
+            store.upsert_contracts(self.conn, meta)
         self._catalog, self._catalog_at = cat, now
         log.info("catalog: %d Polymarket + %d Kalshi open fixtures",
                  len(cat["polymarket"]), len(cat["kalshi"]))

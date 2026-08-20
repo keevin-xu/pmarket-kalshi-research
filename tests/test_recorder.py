@@ -227,3 +227,18 @@ def test_unrecognised_book_stays_a_gap_not_a_zero():
     s = record.parse_kalshi_market(mkt, {"orderbook_fp": {}}, None, 1,
                                    "2026-08-01T00:00:00.000Z")
     assert s["full_bid_usd"] is None and s["n_levels"] is None
+
+
+def test_recorder_persists_what_it_is_recording(conn):
+    """A book_snapshot keyed by contract_id is an opaque number unless the
+    contract is stored too: the venue stops serving a market after settlement
+    (Kalshi drops it at ~68 days), after which the rows can never be mapped
+    back to teams, family or tier."""
+    rec = record.Recorder(conn, SPORT, _FakeKalshi(), _FakePoly())
+    rec.poll_cycle()
+    rows = {r[0]: (r[1], r[2]) for r in
+            conn.execute("SELECT contract_id, venue, family FROM contracts")}
+    snaps = {r[0] for r in conn.execute("SELECT DISTINCT contract_id FROM book_snapshots")}
+    assert snaps and snaps.issubset(rows), "every recorded book must have metadata"
+    assert rows["0xabc"][0] == "polymarket" and rows["0xabc"][1] == "map_winner"
+    assert rows["KXLOLMAP-X-1-GENG"][0] == "kalshi"
